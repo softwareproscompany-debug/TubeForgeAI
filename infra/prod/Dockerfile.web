@@ -11,6 +11,9 @@ ARG NEXT_PUBLIC_API_URL=https://tubeforge.aixentium.com
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ ./
+# Some scaffolds ship without a public/ dir; ensure it exists so the
+# runner stage COPY below never fails on a missing source.
+RUN mkdir -p ./public
 RUN npm run build
 
 FROM node:20-alpine AS runner
