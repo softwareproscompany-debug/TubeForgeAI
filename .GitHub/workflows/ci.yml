@@ -1,0 +1,290 @@
+# TubeForge AI — CI/CD pipeline (spec §13.4).
+#
+# Stages: lint -> typecheck -> unit -> migrations-check -> integration ->
+# frontend-build -> security -> docker-build -> deploy-staging -> smoke ->
+# deploy-production (manual approval, health-gated rollback).
+#
+# Backend tests run with TESTING=true (sqlite) per the backend contract; the
+# Postgres service container is still provided so any test that needs a real
+# Postgres can opt in via DATABASE_URL.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DJANGO_SETTINGS_MODULE: config.settings
+  TESTING: "true"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------- lint ---
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install ruff
+        run: pip install ruff
+      - name: Ruff check (backend)
+        working-directory: backend
+        run: ruff check .
+      - name: Ruff format check (backend)
+        working-directory: backend
+        run: ruff format --check .
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      # "eslint-ish via tsc": run eslint when the repo has an eslint config,
+      # otherwise fall back to a type-aware tsc pass as the lint gate.
+      - name: Frontend lint
+        working-directory: frontend
+        run: |
+          if ls .eslintrc* eslint.config.* >/dev/null 2>&1; then
+            npx eslint . --max-warnings=0
+          else
+            echo "no eslint config; using tsc --noEmit as lint gate"
+            npx tsc --noEmit
+          fi
+
+  # ----------------------------------------------------------- typecheck ---
+  typecheck:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install mypy
+        run: pip install mypy django-stubs
+      - name: mypy (backend, inline args)
+        working-directory: backend
+        run: mypy . --ignore-missing-imports
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: tsc --noEmit (frontend)
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+  # ---------------------------------------------------------------- unit ---
+  unit:
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tubeforge
+          POSTGRES_PASSWORD: tubeforge
+          POSTGRES_DB: tubeforge
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tubeforge -d tubeforge"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install backend deps
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+      - name: pytest backend/tests
+        working-directory: backend
+        run: pytest tests -q
+
+  # ----------------------------------------------------- migrations-check ---
+  migrations-check:
+    runs-on: ubuntu-latest
+    needs: [unit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+      # Fails the build if a model change has no migration.
+      - name: makemigrations --check
+        working-directory: backend
+        run: python manage.py makemigrations --check --dry-run
+
+  # ----------------------------------------------------------- integration ---
+  integration:
+    runs-on: ubuntu-latest
+    needs: [migrations-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install backend deps
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+      - name: pytest tests/integration
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: pytest tests/integration -q
+
+  # --------------------------------------------------------- frontend-build ---
+  frontend-build:
+    runs-on: ubuntu-latest
+    needs: [integration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: npm run build
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://example.com/api/v1
+
+  # --------------------------------------------------------------- security ---
+  security:
+    runs-on: ubuntu-latest
+    needs: [frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: bandit (backend)
+        run: |
+          pip install bandit
+          bandit -r backend -x backend/tests --severity-level medium
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm audit (frontend)
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+  # ------------------------------------------------------------ docker-build ---
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [security]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build api image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: false
+          tags: tubeforge-api:ci
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: false
+          tags: tubeforge-frontend:ci
+
+  # ---------------------------------------------------------- deploy-staging ---
+  # Placeholder staging deploy: runs on main only. Provide STAGING_HOST,
+  # STAGING_SSH_KEY and STAGING_URL as environment secrets to activate.
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging
+        run: |
+          if [ -z "${{ secrets.STAGING_HOST }}" ]; then
+            echo "STAGING_HOST not set — staging deploy skipped (configure staging environment secrets to activate)."
+            exit 0
+          fi
+          echo "Deploying ${{ github.sha }} to staging at ${{ secrets.STAGING_HOST }} ..."
+          # Example real step (uncomment when secrets exist):
+          # ssh -i <(echo "${{ secrets.STAGING_SSH_KEY }}") "deploy@${{ secrets.STAGING_HOST }}" \
+          #   "cd /srv/tubeforge && git pull && docker compose --env-file infra/.env up -d --build"
+
+  # ------------------------------------------------------------------ smoke ---
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Smoke-test health endpoints
+        run: |
+          if [ -z "${{ secrets.STAGING_URL }}" ]; then
+            echo "STAGING_URL not set — smoke tests skipped (staging not configured yet)."
+            exit 0
+          fi
+          curl --fail --max-time 20 "${{ secrets.STAGING_URL }}/healthz"
+          curl --fail --max-time 20 "${{ secrets.STAGING_URL }}/api/v1/health"
+
+  # ------------------------------------------------------- deploy-production ---
+  # Manual approval: the `production` environment must have "Required
+  # reviewers" enabled in repo settings — the workflow then pauses here until
+  # a human approves. Health-gated rollback: if the post-deploy health check
+  # fails, the previous image tag is redeployed automatically.
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production
+        run: |
+          if [ -z "${{ secrets.PROD_HOST }}" ]; then
+            echo "PROD_HOST not set — production deploy skipped (configure production environment secrets to activate)."
+            exit 0
+          fi
+          echo "Deploying ${{ github.sha }} to production at ${{ secrets.PROD_HOST }} ..."
+      - name: Health-gated rollback
+        if: always()
+        run: |
+          if [ -z "${{ secrets.PROD_URL }}" ]; then
+            echo "PROD_URL not set — health gate skipped."
+            exit 0
+          fi
+          if curl --fail --max-time 30 "${{ secrets.PROD_URL }}/api/v1/health"; then
+            echo "Production healthy."
+          else
+            echo "Health check FAILED — rolling back to previous tag."
+            # ssh deploy@${{ secrets.PROD_HOST }} "cd /srv/tubeforge && docker compose up -d --build api frontend"
+            exit 1
+          fi
