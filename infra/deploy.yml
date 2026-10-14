@@ -1,0 +1,43 @@
+# TubeForge AI — GitHub Actions deploy to the Coolify VPS.
+#
+# STAGED COPY: the GitHub App token cannot write to .github/workflows/
+# (it lacks the `workflows` permission — API writes there 403), so this file
+# lives at infra/deploy.yml. To activate it:
+#   1. On github.com, open the repo -> Add file -> Create new file.
+#   2. Name it exactly: .github/workflows/deploy.yml
+#   3. Paste this file's contents -> Commit changes.
+#
+# Required repo secrets (repo -> Settings -> Secrets and variables -> Actions):
+#   VPS_HOST     VPS hostname or IP, e.g. srv2057485.hstgr.cloud
+#   VPS_SSH_KEY  Private SSH key authorized for root on the VPS (no passphrase).
+#                One-time setup paste-commands are in infra/prod/DEPLOY.md.
+#
+# NOTE: the first-ever deploy still needs the manual bootstrap in
+# infra/prod/DEPLOY.md (clone, .env, Traefik route, DNS). After that,
+# every push to main redeploys automatically.
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /root/tubeforge-deploy
+            git pull origin main
+            docker compose -f infra/prod/docker-compose.prod.yml --env-file infra/prod/.env up -d --build
+            docker exec tubeforge-api python manage.py migrate --noinput
+            sleep 5
+            curl -sf https://tubeforge.aixentium.com/api/v1/ -o /dev/null \
+              && echo "API OK" || echo "API check needs attention"

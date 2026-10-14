@@ -1,0 +1,92 @@
+# TubeForge AI — production (single VPS, Traefik in front).
+#
+# Phase 1: postgres + redis + api + web only. Temporal/MinIO/GPU workers are
+# phase 2 — the app runs workflows through its sync fallback until then
+# (see DEPLOY.md).
+#
+# Run from the repo root:
+#   docker compose -f infra/prod/docker-compose.prod.yml --env-file infra/prod/.env up -d --build
+#
+# Networking (proven FenceFlow/ForgeOS pattern):
+# - `backend` is an internal, IPv6-disabled bridge: postgres/redis live here
+#   only. (Docker DNS on some hosts resolves DB hostnames to IPv6 and breaks
+#   postgres auth — hence enable_ipv6: false.)
+# - `coolify` is the EXTERNAL network Traefik is attached to. Only containers
+#   on this network are routable by Traefik. api + web attach to both.
+
+name: tubeforge-prod
+
+networks:
+  backend:
+    driver: bridge
+    enable_ipv6: false
+  coolify:
+    external: true
+
+volumes:
+  pgdata:
+  redisdata:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/prod/Dockerfile.api
+    container_name: tubeforge-api
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+      - coolify
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/prod/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: tubeforge-web
+    restart: always
+    networks:
+      - coolify

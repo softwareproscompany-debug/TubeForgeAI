@@ -1,0 +1,69 @@
+# TubeForge AI — Traefik dynamic config (file provider).
+# Copy to /data/coolify/proxy/dynamic/tubeforge.yaml on the VPS (watch=true picks it up).
+#
+# Single domain, path-routed: web serves the SPA, /api/* goes to Django.
+# The api router carries priority 100 so it ALWAYS beats the web catch-all.
+
+http:
+  routers:
+    tubeforge-web-http:
+      rule: "Host(`tubeforge.aixentium.com`)"
+      entryPoints:
+        - web
+      middlewares:
+        - tubeforge-redirect-https
+      service: noop@internal
+
+    tubeforge-web:
+      rule: "Host(`tubeforge.aixentium.com`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - tubeforge-gzip
+        - tubeforge-secure-headers
+      service: tubeforge-web
+
+    tubeforge-api:
+      rule: "Host(`tubeforge.aixentium.com`) && PathPrefix(`/api`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - tubeforge-gzip
+        - tubeforge-secure-headers
+      service: tubeforge-api
+
+  middlewares:
+    tubeforge-redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    tubeforge-gzip:
+      compress: {}
+
+    tubeforge-secure-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: SAMEORIGIN
+        referrerPolicy: strict-origin-when-cross-origin
+
+  services:
+    tubeforge-web:
+      loadBalancer:
+        servers:
+          - url: "http://tubeforge-web:3000"
+
+    tubeforge-api:
+      loadBalancer:
+        servers:
+          - url: "http://tubeforge-api:8000"
