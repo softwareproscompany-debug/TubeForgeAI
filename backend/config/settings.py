@@ -6,7 +6,7 @@ Required env vars (fail fast with ImproperlyConfigured when missing):
   DATABASE_URL - postgres:// URL. Not required when TESTING=true (sqlite :memory:).
 """
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
@@ -47,8 +47,8 @@ def _database_config():
     return {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": parts.path.lstrip("/") or "tubeforge",
-        "USER": parts.username or "",
-        "PASSWORD": parts.password or "",
+        "USER": unquote(parts.username or ""),
+        "PASSWORD": unquote(parts.password or ""),
         "HOST": parts.hostname or "localhost",
         "PORT": parts.port or 5432,
     }
@@ -75,6 +75,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -114,6 +115,7 @@ TIME_ZONE = "UTC"
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
