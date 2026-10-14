@@ -9,7 +9,7 @@ http:
     tubeforge-web-http:
       rule: "Host(`tubeforge.aixentium.com`)"
       entryPoints:
-        - web
+        - http
       middlewares:
         - tubeforge-redirect-https
       service: noop@internal
@@ -17,7 +17,7 @@ http:
     tubeforge-web:
       rule: "Host(`tubeforge.aixentium.com`)"
       entryPoints:
-        - websecure
+        - https
       tls:
         certResolver: letsencrypt
       middlewares:
@@ -29,7 +29,7 @@ http:
       rule: "Host(`tubeforge.aixentium.com`) && PathPrefix(`/api`)"
       priority: 100
       entryPoints:
-        - websecure
+        - https
       tls:
         certResolver: letsencrypt
       middlewares:
