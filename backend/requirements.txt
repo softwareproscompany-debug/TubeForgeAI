@@ -1,0 +1,9 @@
+Django>=5.0,<6.0
+djangorestframework
+psycopg[binary]
+cryptography
+requests
+redis
+temporalio
+pytest
+pytest-django
