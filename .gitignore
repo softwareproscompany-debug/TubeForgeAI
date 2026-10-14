@@ -1,0 +1,59 @@
+# TubeForge AI .gitignore — no secrets, no artifacts, no dependency dirs
+
+# Environment & secrets (NEVER commit)
+.env
+.env.*
+*.env
+!infra/.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+secrets/
+vault/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+mypy_cache/
+ruff_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Media & data (generated at runtime)
+media/
+renders/
+uploads/
+*.mp4
+*.mov
+*.mkv
+*.wav
+*.mp3
+pgdata/
+minio-data/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
