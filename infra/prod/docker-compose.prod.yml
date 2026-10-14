@@ -44,7 +44,9 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - backend
+      backend:
+        aliases:
+          - tubeforge-db
 
   redis:
     image: redis:7-alpine
@@ -58,7 +60,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - backend
+      backend:
+        aliases:
+          - tubeforge-redis
 
   api:
     build:
@@ -69,8 +73,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@tubeforge-db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://tubeforge-redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
