@@ -1,0 +1,343 @@
+# TubeForge AI — local-first production stack.
+#
+# Run the core app WITHOUT any GPU hardware or model downloads:
+#   docker compose --env-file .env up -d
+# The dashboard, API, workers and render pipeline all work on CPU. GPU-backed
+# services (comfyui, inference) are opt-in via profiles:
+#   docker compose --env-file .env --profile gpu up -d
+#
+# LOCAL-FIRST DEGRADATION: when GPU workers are offline, generation jobs are
+# NOT dropped. The provider router (providers.gateway) keeps them QUEUED and
+# the workflow engine parks runs in BLOCKED_ON_RESOURCES; as soon as a GPU
+# worker registers, queued jobs resume transparently. The UI shows blocked
+# runs with a clear "waiting for GPU worker" state instead of failing.
+#
+# Only Caddy publishes ports to the host (80/443). Everything else lives on
+# the single internal `tubeforge` network.
+
+name: tubeforge
+
+networks:
+  tubeforge:
+    driver: bridge
+    internal: true
+
+volumes:
+  pgdata:
+  redisdata:
+  minio-data:
+  caddy-data:
+  caddy-config:
+  prometheus-data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Internal only: no ports published. Reachable as postgres:5432 inside the net.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [tubeforge]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Internal only. Used for Celery-style queues, cache, and rate limiting.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [tubeforge]
+
+  temporal:
+    image: temporalio/auto-setup:1.24
+    restart: unless-stopped
+    # Internal only: gRPC on 7233. Durable workflow orchestration for the
+    # 21-state WorkflowRun machine.
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD}
+      POSTGRES_SEEDS: postgres
+    expose: ["7233"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [tubeforge]
+
+  temporal-ui:
+    image: temporalio/ui:2.31
+    restart: unless-stopped
+    profiles: [tools]
+    # Internal only, exposed to the outside ONLY through Caddy with auth
+    # (see infra/Caddyfile). Never publish this port directly.
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_UI_PORT: 8080
+    expose: ["8080"]
+    depends_on:
+      - temporal
+    networks: [tubeforge]
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    restart: unless-stopped
+    # Internal only: S3-compatible object store for assets, renders, uploads.
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+    expose: ["9000", "9001"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [tubeforge]
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Internal only: Caddy proxies /api/* here. Port 8000 is container-local.
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      TEMPORAL_HOST: temporal:7233
+    expose: ["8000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health').read()\""]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [tubeforge]
+
+  temporal-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Runs the Temporal workflow/activity worker entrypoint provided by the
+    # backend (workflows app). Same image as api, worker-only command.
+    command: ["python", "manage.py", "temporal_worker"]
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      TEMPORAL_HOST: temporal:7233
+      AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-4}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      api:
+        condition: service_healthy
+    # GPU reservation is OPTIONAL: uncomment when running GPU-backed
+    # activities (ComfyUI/vLLM). Without it the worker runs CPU-only and
+    # GPU tasks stay BLOCKED_ON_RESOURCES until a GPU worker appears.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    networks: [tubeforge]
+
+  render-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # FFmpeg is installed in the backend image by its Dockerfile. This worker
+    # consumes render jobs, assembles timelines and writes final MP4s to MinIO.
+    command: ["python", "manage.py", "render_worker"]
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      MAX_RENDER_CONCURRENCY: ${MAX_RENDER_CONCURRENCY:-2}
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # Optional GPU (NVENC) — same pattern as temporal-worker: uncomment for HW encode.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    networks: [tubeforge]
+
+  ai-gateway:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Local-first AI gateway: routes generation tasks across local (ComfyUI,
+    # vLLM/llama.cpp) and cloud providers with budget enforcement. Reuses the
+    # api image with a gateway-only command; safe to scale to 0 when unused.
+    command: ["python", "manage.py", "ai_gateway"]
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      COMFYUI_URL: ${COMFYUI_URL:-}
+      VLLM_URL: ${VLLM_URL:-}
+    expose: ["8001"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [tubeforge]
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    # Internal only: Caddy proxies / here.
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    expose: ["3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [tubeforge]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # The ONLY service with host-published ports.
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - api
+    networks: [tubeforge]
+
+  # ---- Optional GPU services (profile: gpu) ----
+  # None of these are required. Start explicitly:
+  #   docker compose --profile gpu up -d comfyui inference
+  # While they are offline, GPU-bound generation jobs queue in
+  # BLOCKED_ON_RESOURCES instead of failing (see header comment).
+
+  comfyui:
+    profiles: [gpu]
+    # You supply your own ComfyUI image (set COMFYUI_IMAGE). There is no
+    # blessed default image in this repo; the service slot, volume layout and
+    # URL wiring (COMFYUI_URL=http://comfyui:8188) are provided.
+    image: ${COMFYUI_IMAGE:-local/comfyui:manual}
+    restart: unless-stopped
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    expose: ["8188"]
+    volumes:
+      # Mount your ComfyUI models/checkpoints here.
+      - ./comfyui-models:/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks: [tubeforge]
+
+  inference:
+    profiles: [gpu]
+    # Local LLM inference slot (vLLM or llama.cpp server). You supply the
+    # model via a volume mount; nothing is downloaded by this repo.
+    image: ${VLLM_IMAGE:-ghcr.io/vllm/vllm-openai:latest}
+    restart: unless-stopped
+    command: ["--model", "${INFERENCE_MODEL:-facebook/opt-125m}", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      HUGGING_FACE_HUB_CACHE: /models
+    expose: ["8000"]
+    volumes:
+      # Mount your downloaded model weights here (read-only).
+      - ./inference-models:/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks: [tubeforge]
+
+  # ---- Observability (profile: observability) ----
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v2.55.0
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    expose: ["9090"]
+    networks: [tubeforge]
+
+  node-exporter:
+    profiles: [observability]
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    expose: ["9100"]
+    networks: [tubeforge]

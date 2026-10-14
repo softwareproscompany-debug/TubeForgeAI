@@ -1,0 +1,55 @@
+# TubeForge AI — Caddy reverse proxy.
+# The ONLY ingress point. All other services are internal-only.
+# PUBLIC_APP_URL is provided via environment (see infra/.env.example).
+# No secrets in this file.
+
+{
+	# Automatic HTTPS via Let's Encrypt. Replace with your ACME email in prod.
+	# email ops@example.com
+}
+
+{env.PUBLIC_APP_URL} {
+	encode gzip
+
+	# --- Security headers ---
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# --- API ---
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# --- Temporal UI (restricted) ---
+	# /temporal-ui/* is proxied with a path prefix strip. ACCESS CONTROL:
+	# Option A (recommended): enable basic_auth below with a bcrypt hash
+	#   generated via `caddy hash-password`, stored in an imported snippet
+	#   file that is NOT committed (e.g. /etc/caddy/auth.caddyfile).
+	# Option B: restrict by client IP allowlist:
+	#   @internal { remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 }
+	#   handle @internal { uri strip_prefix /temporal-ui; reverse_proxy temporal-ui:8080 }
+	#   handle { respond "Forbidden" 403 }
+	# Default below: proxied but you MUST uncomment one of the options above
+	# before exposing this to the internet.
+	handle /temporal-ui/* {
+		# import /etc/caddy/auth.caddyfile   # <-- uncomment when auth snippet exists
+		uri strip_prefix /temporal-ui
+		reverse_proxy temporal-ui:8080
+	}
+
+	# --- Frontend (everything else) ---
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	# --- Health endpoint for load balancers / CI smoke tests ---
+	handle /healthz {
+		respond "ok" 200
+	}
+}

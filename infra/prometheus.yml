@@ -1,0 +1,100 @@
+# TubeForge AI — Prometheus scrape configuration.
+# Enable with: docker compose --profile observability up -d prometheus node-exporter
+# The api service exposes Prometheus metrics at /api/v1/metrics (Django view,
+# no auth required from inside the cluster; Caddy does NOT proxy this path).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: tubeforge
+    replica: "0"
+
+# To enable alerting: save the commented rule block at the bottom of this file
+# as infra/alerts.yml and uncomment the rule_files line below.
+# rule_files:
+#   - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Prometheus itself.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Django API: request latency, workflow run counters, queue depth gauges,
+  # provider spend counters, render job durations. Metrics path is
+  # /api/v1/metrics (see backend metrics view).
+  - job_name: tubeforge-api
+    metrics_path: /api/v1/metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: api
+
+  # Temporal server metrics (SDK + server stats on :9090).
+  - job_name: temporal
+    static_configs:
+      - targets: ["temporal:9090"]
+        labels:
+          service: temporal
+
+  # Host-level metrics. node-exporter only runs with --profile observability.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          service: host
+
+# ---------------------------------------------------------------------------
+# ALERT + RECORDING RULE EXAMPLES
+# Save everything below the line as infra/alerts.yml, mount it into the
+# prometheus service, and set rule_files (see above) to activate.
+# ---------------------------------------------------------------------------
+# groups:
+#   - name: tubeforge.rules
+#     interval: 30s
+#     rules:
+#       # 1) Queue depth high: generation/render queue backing up.
+#       - record: tubeforge:queue_depth:sum
+#         expr: sum(tubeforge_queue_depth) by (queue)
+#       - alert: QueueDepthHigh
+#         expr: tubeforge:queue_depth:sum > 100
+#         for: 5m
+#         labels: {severity: warning}
+#         annotations:
+#           summary: "Queue {{ $labels.queue }} depth {{ $value }} (>100 for 5m)"
+#
+#       # 2) Workflow failure rate: share of runs ending FAILED over 15m.
+#       - record: tubeforge:workflow_failure_ratio
+#         expr: |
+#           sum(rate(tubeforge_workflow_runs_total{status="FAILED"}[15m]))
+#           /
+#           sum(rate(tubeforge_workflow_runs_total[15m])) > 0
+#       - alert: WorkflowFailureRateHigh
+#         expr: tubeforge:workflow_failure_ratio > 0.1
+#         for: 10m
+#         labels: {severity: critical}
+#         annotations:
+#           summary: "Workflow failure ratio {{ $value | printf \"%.2f\" }} (>10% for 10m)"
+#
+#       # 3) GPU saturation: all GPU slots busy while jobs wait.
+#       - alert: GPUSaturated
+#         expr: |
+#           tubeforge_gpu_jobs_running >= on() group_left
+#           tubeforge_gpu_slots_total
+#           and
+#           tubeforge:queue_depth:sum{queue="gpu"} > 0
+#         for: 10m
+#         labels: {severity: warning}
+#         annotations:
+#           summary: "GPU saturated: jobs waiting while all slots busy"
+#
+#       # 4) Disk space: MinIO / Postgres volume filling up.
+#       - alert: DiskSpaceLow
+#         expr: |
+#           (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+#         for: 5m
+#         labels: {severity: critical}
+#         annotations:
+#           summary: "Disk <15% free on {{ $labels.instance }}"
