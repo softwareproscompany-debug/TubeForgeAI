@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background-color: #0a0e14;
+  color: #e6edf3;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e2a3a transparent;
+}
+
+input, select, textarea {
+  color-scheme: dark;
+}
+
+/* Restrained cinematic focus ring — cyan accent only on interactive elements */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.6);
+  outline-offset: 1px;
+}
