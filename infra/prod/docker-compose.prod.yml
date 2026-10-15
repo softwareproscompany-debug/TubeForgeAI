@@ -80,6 +80,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # TCP-level readiness: proves gunicorn is accepting connections after
+    # migrations + collectstatic finish (first boot takes ~1min). Pure TCP —
+    # deliberately not HTTP, so Django ALLOWED_HOSTS can't fail it.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import socket; socket.create_connection(('127.0.0.1', 8000), timeout=3).close()\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
     networks:
       - backend
       - coolify
