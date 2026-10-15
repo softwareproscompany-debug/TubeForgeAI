@@ -19,6 +19,9 @@ class UUIDModel(models.Model):
 class User(AbstractUser, UUIDModel):
     email = models.EmailField(unique=True)
 
+    class Meta:
+        pass
+
     def __str__(self):
         return self.username
 

@@ -7,6 +7,7 @@ TEMPORAL_HOST at a live server for durable execution.
 """
 
 from datetime import timedelta
+from typing import Any
 
 try:
     from temporalio import workflow
@@ -71,7 +72,7 @@ class VideoProductionWorkflow:
             ("RENDERING", "render_stage"),
             ("VALIDATING", "validate_stage"),
         ]
-        completed = []
+        completed: list[dict[str, Any]] = []
         for stage_name, activity_name in stages:
             await workflow.wait_condition(lambda: not self._paused)
             if self._cancel_requested:
