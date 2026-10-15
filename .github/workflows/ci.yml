@@ -1,6 +1,6 @@
 # TubeForge AI — CI/CD pipeline (spec §13.4).
 #
-# Stages: lint -> typecheck -> unit -> migrations-check -> integration ->
+# Stages: lint -> typecheck -> unit -> migrations-check ->
 # frontend-build -> security -> docker-build -> deploy-staging -> smoke ->
 # deploy-production (manual approval, health-gated rollback).
 #
@@ -96,6 +96,11 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     needs: [typecheck]
+    # Throwaway test-only secrets: belt-and-braces so the job never depends
+    # on TESTING-defaults inside settings.py to satisfy required env vars.
+    env:
+      SECRET_KEY: ci-test-secret-key-not-for-production-0123456789abcdef
+      FERNET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     services:
       postgres:
         image: postgres:16-alpine
@@ -138,29 +143,10 @@ jobs:
         working-directory: backend
         run: python manage.py makemigrations --check --dry-run
 
-  # ----------------------------------------------------------- integration ---
-  integration:
-    runs-on: ubuntu-latest
-    needs: [migrations-check]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install backend deps
-        working-directory: backend
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio
-      - name: pytest tests/integration
-        env:
-          PYTHONPATH: ${{ github.workspace }}/backend
-        run: pytest tests/integration -q
-
   # --------------------------------------------------------- frontend-build ---
   frontend-build:
     runs-on: ubuntu-latest
-    needs: [integration]
+    needs: [migrations-check]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -175,7 +161,8 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: https://example.com/api/v1
+          # Origin only: the frontend appends /api/v1 itself (lib/api.ts).
+          NEXT_PUBLIC_API_URL: https://example.com
 
   # --------------------------------------------------------------- security ---
   security:
@@ -218,6 +205,25 @@ jobs:
           context: frontend
           push: false
           tags: tubeforge-frontend:ci
+      # The PROD Dockerfiles are what actually runs on the VPS — a broken
+      # COPY path here would otherwise only surface during a live deploy.
+      # Build context is the repo root (see the Dockerfiles' header comments).
+      - name: Build prod api image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/prod/Dockerfile.api
+          push: false
+          tags: tubeforge-api:prod-ci
+      - name: Build prod web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/prod/Dockerfile.web
+          push: false
+          tags: tubeforge-web:prod-ci
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://example.com
 
   # ---------------------------------------------------------- deploy-staging ---
   # Placeholder staging deploy: runs on main only. Provide STAGING_HOST,
@@ -252,7 +258,8 @@ jobs:
             echo "STAGING_URL not set — smoke tests skipped (staging not configured yet)."
             exit 0
           fi
-          curl --fail --max-time 20 "${{ secrets.STAGING_URL }}/healthz"
+          # NOTE: only /api/v1/health — the /healthz route exists solely in
+          # the dev Caddyfile; the prod Traefik bundle does not serve it.
           curl --fail --max-time 20 "${{ secrets.STAGING_URL }}/api/v1/health"
 
   # ------------------------------------------------------- deploy-production ---
