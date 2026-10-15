@@ -1,4 +1,5 @@
 """Media engine tests: timeline validation, incremental planning, render manifests."""
+
 import pytest
 
 from projects import media_engine
@@ -10,19 +11,47 @@ def _valid_timeline():
         "version": "v1",
         "canvas": {"width": 1920, "height": 1080, "fps": 30},
         "video_tracks": [
-            {"id": "v1", "clips": [
-                {"id": "c1", "asset_id": "a1", "scene_id": "s1",
-                 "start": 0, "duration": 5, "in_point": 0, "out_point": 5,
-                 "transition": {"type": "fade", "duration": 0.5}},
-                {"id": "c2", "asset_id": "a2", "scene_id": "s2",
-                 "start": 5, "duration": 5, "in_point": 0, "out_point": 5},
-            ]},
+            {
+                "id": "v1",
+                "clips": [
+                    {
+                        "id": "c1",
+                        "asset_id": "a1",
+                        "scene_id": "s1",
+                        "start": 0,
+                        "duration": 5,
+                        "in_point": 0,
+                        "out_point": 5,
+                        "transition": {"type": "fade", "duration": 0.5},
+                    },
+                    {
+                        "id": "c2",
+                        "asset_id": "a2",
+                        "scene_id": "s2",
+                        "start": 5,
+                        "duration": 5,
+                        "in_point": 0,
+                        "out_point": 5,
+                    },
+                ],
+            },
         ],
         "audio_tracks": [
-            {"id": "a-t1", "kind": "narration", "clips": [
-                {"id": "ac1", "asset_id": "a3", "start": 0, "duration": 10,
-                 "gain_db": 0, "fade_in": 0.5, "fade_out": 0.5},
-            ]},
+            {
+                "id": "a-t1",
+                "kind": "narration",
+                "clips": [
+                    {
+                        "id": "ac1",
+                        "asset_id": "a3",
+                        "start": 0,
+                        "duration": 10,
+                        "gain_db": 0,
+                        "fade_in": 0.5,
+                        "fade_out": 0.5,
+                    },
+                ],
+            },
         ],
         "captions": [{"start": 0, "end": 4, "text": "Hello world"}],
         "overlays": [],
@@ -67,8 +96,10 @@ def test_incremental_plan_no_changes_reruns_nothing():
 
 def test_build_render_manifest_contains_hashes_and_versions():
     manifest = media_engine.build_render_manifest(
-        {"a1": "abc123", "a2": "def456"}, "tv-1",
-        {"video_codec": "libx264"}, {"timeline_valid": True},
+        {"a1": "abc123", "a2": "def456"},
+        "tv-1",
+        {"video_codec": "libx264"},
+        {"timeline_valid": True},
     )
     assert manifest["asset_hashes"] == {"a1": "abc123", "a2": "def456"}
     assert manifest["timeline_version_id"] == "tv-1"

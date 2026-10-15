@@ -1,4 +1,5 @@
 """Research URL routes."""
+
 from django.urls import path
 
 from .views import ChannelIdeasView, IdeaCreateProjectView, ResearchRunViewSet
@@ -12,5 +13,9 @@ urlpatterns = [
     path("research-runs/<uuid:pk>", run_detail, name="research-run-detail"),
     path("research-runs/<uuid:pk>/cancel", run_cancel, name="research-run-cancel"),
     path("channels/<uuid:pk>/ideas", ChannelIdeasView.as_view(), name="channel-ideas"),
-    path("ideas/<uuid:pk>/create-project", IdeaCreateProjectView.as_view(), name="idea-create-project"),
+    path(
+        "ideas/<uuid:pk>/create-project",
+        IdeaCreateProjectView.as_view(),
+        name="idea-create-project",
+    ),
 ]

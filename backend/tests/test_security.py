@@ -1,5 +1,6 @@
 """Security tests: owner scoping, secret redaction, OAuth state integrity,
 audit scrubbing."""
+
 import pytest
 
 from core.models import AuditEvent
@@ -38,8 +39,11 @@ def test_secrets_redacted_in_provider_responses(auth_client, user):
         owner=user, name="render-api-key", encrypted_value=encrypt_value(plaintext)
     )
     provider = Provider.objects.create(
-        name="secret-box", adapter_type="external_api", deployment_type="external",
-        base_url="https://api.example.com", secret_reference=secret,
+        name="secret-box",
+        adapter_type="external_api",
+        deployment_type="external",
+        base_url="https://api.example.com",
+        secret_reference=secret,
         capabilities={"task_types": ["image"]},
     )
     response = auth_client.get(f"/api/v1/providers/{provider.id}")
@@ -81,7 +85,10 @@ def test_oauth_state_expiry_rejected(auth_client):
 @pytest.mark.django_db
 def test_audit_written_without_secrets(user):
     record_audit(
-        user, "test.action", "secret", "1",
+        user,
+        "test.action",
+        "secret",
+        "1",
         metadata={
             "api_password": "hunter2",
             "nested": {"access_token": "tok-abc", "note": "hello"},

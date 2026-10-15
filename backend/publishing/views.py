@@ -1,17 +1,19 @@
 """Publishing views: idempotent publication jobs, integrity checks, approvals,
 scheduling, and source-labeled analytics."""
+
 import zoneinfo
 from datetime import datetime
 
-from channels.models import Channel
-from core.utils import InvalidTransitionAPI, record_audit
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from projects.models import Asset, Project
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+
+from channels.models import Channel
+from core.utils import InvalidTransitionAPI, record_audit
+from projects.models import Asset, Project
 
 from . import youtube as yt
 from .models import AnalyticsSnapshot, PublicationJob
@@ -25,7 +27,8 @@ from .serializers import (
 def _owned_publication(user, pk):
     return get_object_or_404(
         PublicationJob.objects.select_related("project__channel", "channel"),
-        pk=pk, channel__owner=user,
+        pk=pk,
+        channel__owner=user,
     )
 
 
@@ -36,8 +39,8 @@ def _blocking_issues(publication):
 
 class PublicationJobViewSet(viewsets.ModelViewSet):
     serializer_class = PublicationJobSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ["get", "post", "patch", "delete"]
+    permission_classes = (permissions.IsAuthenticated,)
+    http_method_names = ("get", "post", "patch", "delete")
 
     def get_queryset(self):
         return PublicationJob.objects.filter(
@@ -67,9 +70,13 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
         )
         asset = serializer.validated_data.get("asset")
         if asset is not None:
-            asset = get_object_or_404(Asset, pk=asset.id, project__channel__owner=request.user)
+            asset = get_object_or_404(
+                Asset, pk=asset.id, project__channel__owner=request.user
+            )
         publication = PublicationJob.objects.create(
-            project=project, channel=project.channel, asset=asset,
+            project=project,
+            channel=project.channel,
+            asset=asset,
             title=serializer.validated_data["title"],
             description=serializer.validated_data.get("description", ""),
             tags=serializer.validated_data.get("tags", []),
@@ -79,16 +86,23 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
             idempotency_key=key,
         )
         record_audit(
-            request.user, "publication.create", "publication_job", str(publication.id),
+            request.user,
+            "publication.create",
+            "publication_job",
+            str(publication.id),
             request=request,
         )
-        return Response(PublicationJobSerializer(publication).data,
-                        status=status.HTTP_201_CREATED)
+        return Response(
+            PublicationJobSerializer(publication).data, status=status.HTTP_201_CREATED
+        )
 
     def perform_update(self, serializer):
         publication = serializer.save()
         record_audit(
-            self.request.user, "publication.update", "publication_job", str(publication.id),
+            self.request.user,
+            "publication.update",
+            "publication_job",
+            str(publication.id),
             request=self.request,
         )
 
@@ -100,8 +114,9 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
             yt.UploadStateMachine.transition(publication, "VALIDATING")
         except yt.InvalidUploadTransition as exc:
             raise InvalidTransitionAPI(str(exc)) from exc
-        return Response({"issues": issues, "blocking": blocking,
-                         "status": publication.status})
+        return Response(
+            {"issues": issues, "blocking": blocking, "status": publication.status}
+        )
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
@@ -112,21 +127,30 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
         publication = _owned_publication(request.user, pk)
         blocking, issues = _blocking_issues(publication)
         if blocking:
-            raise ValidationError({"blocking": blocking,
-                                   "detail": "Resolve blocking issues before approval."})
+            raise ValidationError(
+                {
+                    "blocking": blocking,
+                    "detail": "Resolve blocking issues before approval.",
+                }
+            )
         policy = publication.channel.publishing_policy or {}
         if policy.get("require_approval", True):
             approved = Approval.objects.filter(
                 project=publication.project, approval_type="PUBLISH", status="APPROVED"
             ).exists()
             if not approved:
-                approval, created = Approval.objects.get_or_create(
-                    project=publication.project, approval_type="PUBLISH", status="PENDING",
+                approval, _created = Approval.objects.get_or_create(
+                    project=publication.project,
+                    approval_type="PUBLISH",
+                    status="PENDING",
                     defaults={"requested_by": request.user},
                 )
                 return Response(
-                    {"approval_required": True, "approval_id": str(approval.id),
-                     "issues": issues},
+                    {
+                        "approval_required": True,
+                        "approval_id": str(approval.id),
+                        "issues": issues,
+                    },
                     status=status.HTTP_202_ACCEPTED,
                 )
         try:
@@ -136,7 +160,10 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
         except yt.InvalidUploadTransition as exc:
             raise InvalidTransitionAPI(str(exc)) from exc
         record_audit(
-            request.user, "publication.approve", "publication_job", str(publication.id),
+            request.user,
+            "publication.approve",
+            "publication_job",
+            str(publication.id),
             request=request,
         )
         return Response(PublicationJobSerializer(publication).data)
@@ -149,7 +176,7 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
         if not raw:
             raise ValidationError({"scheduled_at": "scheduled_at is required."})
         try:
-            scheduled_at = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            scheduled_at = datetime.fromisoformat(str(raw))
         except ValueError as exc:
             raise ValidationError({"scheduled_at": "Must be ISO-8601."}) from exc
         if timezone.is_naive(scheduled_at):
@@ -171,8 +198,12 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
         except yt.InvalidUploadTransition as exc:
             raise InvalidTransitionAPI(str(exc)) from exc
         record_audit(
-            request.user, "publication.schedule", "publication_job", str(publication.id),
-            request=request, metadata={"scheduled_at": scheduled_at.isoformat()},
+            request.user,
+            "publication.schedule",
+            "publication_job",
+            str(publication.id),
+            request=request,
+            metadata={"scheduled_at": scheduled_at.isoformat()},
         )
         return Response(PublicationJobSerializer(publication).data)
 
@@ -184,7 +215,10 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
         except yt.InvalidUploadTransition as exc:
             raise InvalidTransitionAPI(str(exc)) from exc
         record_audit(
-            request.user, "publication.cancel", "publication_job", str(publication.id),
+            request.user,
+            "publication.cancel",
+            "publication_job",
+            str(publication.id),
             request=request,
         )
         return Response(PublicationJobSerializer(publication).data)
@@ -194,7 +228,9 @@ class ChannelAnalyticsView(generics.ListAPIView):
     serializer_class = AnalyticsSnapshotSerializer
 
     def get_queryset(self):
-        channel = get_object_or_404(Channel, pk=self.kwargs["pk"], owner=self.request.user)
+        channel = get_object_or_404(
+            Channel, pk=self.kwargs["pk"], owner=self.request.user
+        )
         return AnalyticsSnapshot.objects.filter(channel=channel)
 
 

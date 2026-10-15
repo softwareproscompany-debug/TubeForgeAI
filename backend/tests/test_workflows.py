@@ -1,5 +1,6 @@
 """Workflow state-machine tests: legal/illegal transitions, terminal states,
 late worker callbacks on canceled runs."""
+
 import pytest
 
 from workflows import engine
@@ -19,10 +20,22 @@ def run(db, project):
 @pytest.mark.django_db
 def test_legal_forward_chain(run):
     chain = [
-        "PLANNING", "AWAITING_APPROVAL", "QUEUED", "RESEARCHING", "SCRIPTING",
-        "STORYBOARDING", "GENERATING_ASSETS", "GENERATING_NARRATION", "ASSEMBLING",
-        "RENDERING", "VALIDATING", "FINAL_REVIEW", "READY_TO_PUBLISH",
-        "UPLOADING", "SCHEDULED", "PUBLISHED",
+        "PLANNING",
+        "AWAITING_APPROVAL",
+        "QUEUED",
+        "RESEARCHING",
+        "SCRIPTING",
+        "STORYBOARDING",
+        "GENERATING_ASSETS",
+        "GENERATING_NARRATION",
+        "ASSEMBLING",
+        "RENDERING",
+        "VALIDATING",
+        "FINAL_REVIEW",
+        "READY_TO_PUBLISH",
+        "UPLOADING",
+        "SCHEDULED",
+        "PUBLISHED",
     ]
     for state in chain:
         engine.transition(run, state)
@@ -83,9 +96,26 @@ def test_canceled_run_ignores_late_worker_callback(run):
 @pytest.mark.django_db
 def test_workflow_states_match_spec():
     assert engine.WORKFLOW_STATES == [
-        "DRAFT", "PLANNING", "AWAITING_APPROVAL", "QUEUED", "RESEARCHING",
-        "SCRIPTING", "STORYBOARDING", "GENERATING_ASSETS", "GENERATING_NARRATION",
-        "ASSEMBLING", "RENDERING", "VALIDATING", "FINAL_REVIEW",
-        "READY_TO_PUBLISH", "UPLOADING", "SCHEDULED", "PUBLISHED", "FAILED",
-        "CANCELED", "PAUSED", "BLOCKED_ON_RESOURCES", "BLOCKED_ON_APPROVAL",
+        "DRAFT",
+        "PLANNING",
+        "AWAITING_APPROVAL",
+        "QUEUED",
+        "RESEARCHING",
+        "SCRIPTING",
+        "STORYBOARDING",
+        "GENERATING_ASSETS",
+        "GENERATING_NARRATION",
+        "ASSEMBLING",
+        "RENDERING",
+        "VALIDATING",
+        "FINAL_REVIEW",
+        "READY_TO_PUBLISH",
+        "UPLOADING",
+        "SCHEDULED",
+        "PUBLISHED",
+        "FAILED",
+        "CANCELED",
+        "PAUSED",
+        "BLOCKED_ON_RESOURCES",
+        "BLOCKED_ON_APPROVAL",
     ]

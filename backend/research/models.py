@@ -1,20 +1,24 @@
 """Research domain models: runs, evidence sources, content ideas."""
-from channels.models import Channel
-from core.models import UUIDModel
+
 from django.db import models
 from django.utils import timezone
 
+from channels.models import Channel
+from core.models import UUIDModel
+
 
 class ResearchRun(UUIDModel):
-    STATUS_CHOICES = [
+    STATUS_CHOICES = (
         ("PENDING", "Pending"),
         ("RUNNING", "Running"),
         ("COMPLETED", "Completed"),
         ("FAILED", "Failed"),
         ("CANCELED", "Canceled"),
-    ]
+    )
 
-    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="research_runs")
+    channel = models.ForeignKey(
+        Channel, on_delete=models.CASCADE, related_name="research_runs"
+    )
     query = models.CharField(max_length=500)
     parameters = models.JSONField(default=dict)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING")
@@ -24,11 +28,13 @@ class ResearchRun(UUIDModel):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ("-created_at",)
 
 
 class ResearchSource(UUIDModel):
-    run = models.ForeignKey(ResearchRun, on_delete=models.CASCADE, related_name="sources")
+    run = models.ForeignKey(
+        ResearchRun, on_delete=models.CASCADE, related_name="sources"
+    )
     source_type = models.CharField(max_length=64)
     source_url = models.CharField(max_length=2000, blank=True, default="")
     title = models.CharField(max_length=500)
@@ -39,16 +45,16 @@ class ResearchSource(UUIDModel):
     license_metadata = models.JSONField(default=dict)
 
     class Meta:
-        ordering = ["title"]
+        ordering = ("title",)
 
 
 class ContentIdea(UUIDModel):
-    STATUS_CHOICES = [
+    STATUS_CHOICES = (
         ("NEW", "New"),
         ("QUEUED", "Queued"),
         ("IN_PROJECT", "In project"),
         ("DISMISSED", "Dismissed"),
-    ]
+    )
 
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="ideas")
     title = models.CharField(max_length=500)
@@ -61,7 +67,9 @@ class ContentIdea(UUIDModel):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["channel", "title"], name="uniq_idea_channel_title"),
-        ]
-        ordering = ["-priority", "-created_at"]
+        constraints = (
+            models.UniqueConstraint(
+                fields=["channel", "title"], name="uniq_idea_channel_title"
+            ),
+        )
+        ordering = ("-priority", "-created_at")

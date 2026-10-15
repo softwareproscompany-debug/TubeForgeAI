@@ -5,17 +5,19 @@ Honesty rules enforced here:
 - We never claim private competitor analytics; demand signals are local
   heuristics and are worded as such.
 """
+
 import hashlib
 import re
 
-from channels.models import Channel
-from core.utils import OwnsChannel, record_audit
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from channels.models import Channel
+from core.utils import OwnsChannel, record_audit
 
 from .models import ContentIdea, ResearchRun, ResearchSource
 from .serializers import (
@@ -35,7 +37,11 @@ _IDEA_ANGLES = [
 
 
 def _keywords(query, limit=6):
-    words = [w.strip().lower() for w in re.split(r"[^\w']+", query or "") if len(w.strip()) > 2]
+    words = [
+        w.strip().lower()
+        for w in re.split(r"[^\w']+", query or "")
+        if len(w.strip()) > 2
+    ]
     seen, out = set(), []
     for word in words:
         if word not in seen:
@@ -54,7 +60,9 @@ def _execute_local_analysis(run):
     for index, keyword in enumerate(keywords[:3]):
         for slot, (angle, angle_title, confidence) in enumerate(_IDEA_ANGLES[:depth]):
             title = f"Demand signal: '{keyword}' — {angle}"
-            content_hash = hashlib.sha256(f"{_ANALYSIS_VERSION}:{title}".encode()).hexdigest()
+            content_hash = hashlib.sha256(
+                f"{_ANALYSIS_VERSION}:{title}".encode()
+            ).hexdigest()
             sources.append(
                 ResearchSource(
                     run=run,
@@ -66,7 +74,10 @@ def _execute_local_analysis(run):
                         "method": _ANALYSIS_VERSION,
                         "keyword": keyword,
                         "angle": angle,
-                        "projected_monthly_searches": 500 * (index + 1) * (slot + 1) * max(len(keyword), 3),
+                        "projected_monthly_searches": 500
+                        * (index + 1)
+                        * (slot + 1)
+                        * max(len(keyword), 3),
                         "competition": "unknown — estimate only, not measured",
                         "disclaimer": (
                             "AI-generated estimate from a local heuristic. "
@@ -81,7 +92,7 @@ def _execute_local_analysis(run):
 
     for slot, (angle, angle_title, confidence) in enumerate(_IDEA_ANGLES[:depth]):
         title = f"{run.query.strip().title()}: {angle_title}"
-        idea, created = ContentIdea.objects.get_or_create(
+        idea, _created = ContentIdea.objects.get_or_create(
             channel=run.channel,
             title=title[:500],
             defaults={
@@ -108,8 +119,8 @@ def _owned_channel(user, pk):
 
 class ResearchRunViewSet(viewsets.ModelViewSet):
     serializer_class = ResearchRunSerializer
-    permission_classes = [permissions.IsAuthenticated, OwnsChannel]
-    http_method_names = ["get", "post", "delete"]
+    permission_classes = (permissions.IsAuthenticated, OwnsChannel)
+    http_method_names = ("get", "post", "delete")
 
     def get_queryset(self):
         return (
@@ -139,15 +150,19 @@ class ResearchRunViewSet(viewsets.ModelViewSet):
         try:
             summary = _execute_local_analysis(run)
             run.status = "COMPLETED"
-        except Exception as exc:  # local analysis must never 500 the request
+        except Exception as exc:  # noqa: BLE001 - local analysis must never 500 the request
             run.status = "FAILED"
             run.error_summary = str(exc)[:500]
             summary = {}
         run.completed_at = timezone.now()
         run.save()
         record_audit(
-            request.user, "research_run.create", "research_run", str(run.id),
-            request=request, metadata={"query": run.query, **summary},
+            request.user,
+            "research_run.create",
+            "research_run",
+            str(run.id),
+            request=request,
+            metadata={"query": run.query, **summary},
         )
         return Response(ResearchRunSerializer(run).data, status=status.HTTP_201_CREATED)
 
@@ -159,7 +174,10 @@ class ResearchRunViewSet(viewsets.ModelViewSet):
             run.completed_at = timezone.now()
             run.save(update_fields=["status", "completed_at"])
             record_audit(
-                request.user, "research_run.cancel", "research_run", str(run.id),
+                request.user,
+                "research_run.cancel",
+                "research_run",
+                str(run.id),
                 request=request,
             )
         return Response(ResearchRunSerializer(run).data)
@@ -186,7 +204,10 @@ class IdeaCreateProjectView(APIView):
             content_idea=idea,
             title=idea.title,
             brief=idea.topic,
-            format=idea.format if idea.format in ("LONG_FORM", "SHORT", "DOCUMENTARY", "EXPLAINER", "CINEMATIC") else "LONG_FORM",
+            format=idea.format
+            if idea.format
+            in ("LONG_FORM", "SHORT", "DOCUMENTARY", "EXPLAINER", "CINEMATIC")
+            else "LONG_FORM",
             target_duration_seconds=600,
             aspect_ratio="16:9",
             language=idea.channel.default_language,
@@ -195,7 +216,11 @@ class IdeaCreateProjectView(APIView):
         idea.status = "IN_PROJECT"
         idea.save(update_fields=["status"])
         record_audit(
-            request.user, "idea.create_project", "project", str(project.id),
-            request=request, metadata={"idea_id": str(idea.id)},
+            request.user,
+            "idea.create_project",
+            "project",
+            str(project.id),
+            request=request,
+            metadata={"idea_id": str(idea.id)},
         )
         return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)

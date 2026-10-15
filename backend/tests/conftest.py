@@ -1,25 +1,28 @@
 """Pytest configuration: in-memory sqlite, throwaway secrets, Django setup."""
+
 import os
 
 os.environ.setdefault("TESTING", "true")
-os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789abcdef-not-for-production")
+os.environ.setdefault(
+    "SECRET_KEY", "test-secret-key-0123456789abcdef-not-for-production"
+)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 try:
     from cryptography.fernet import Fernet
 
     os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
-except Exception:  # pragma: no cover
+except Exception:  # noqa: BLE001 - test setup fallback; pragma: no cover
     os.environ.setdefault("FERNET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 
-import django  # noqa: E402
+import django
 
 django.setup()
 
-import pytest  # noqa: E402
-from django.contrib.auth import get_user_model  # noqa: E402
-from rest_framework.authtoken.models import Token  # noqa: E402
-from rest_framework.test import APIClient  # noqa: E402
+import pytest
+from django.contrib.auth import get_user_model
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
 
 
 @pytest.fixture
@@ -50,8 +53,12 @@ def project(db, channel):
     from projects.models import Project
 
     return Project.objects.create(
-        channel=channel, title="Test Project", format="LONG_FORM",
-        target_duration_seconds=600, aspect_ratio="16:9", language="en",
+        channel=channel,
+        title="Test Project",
+        format="LONG_FORM",
+        target_duration_seconds=600,
+        aspect_ratio="16:9",
+        language="en",
     )
 
 
