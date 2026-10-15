@@ -5,6 +5,7 @@ Incremental rendering: changing a scene invalidates only its dependent outputs.
 ``compute_incremental_plan`` diffs two timeline versions and reports which scenes
 changed, which assets can be reused, and which pipeline stages must re-run.
 """
+
 import hashlib
 import json
 import shutil
@@ -33,7 +34,9 @@ def validate_timeline(data):
     """Validate a timeline against schema v1. Raises TimelineValidationError."""
     details = []
     if not isinstance(data, dict):
-        raise TimelineValidationError("Timeline must be a JSON object.", ["not_an_object"])
+        raise TimelineValidationError(
+            "Timeline must be a JSON object.", ["not_an_object"]
+        )
     if data.get("version") != TIMELINE_SCHEMA_VERSION:
         _err(details, f"timeline.version must be {TIMELINE_SCHEMA_VERSION!r}")
 
@@ -53,14 +56,23 @@ def validate_timeline(data):
         for clip in track.get("clips", []) or []:
             for key in ("id", "asset_id", "start", "duration"):
                 if key not in clip:
-                    _err(details, f"video clip missing required field {key!r} (track {track.get('id')})")
+                    _err(
+                        details,
+                        f"video clip missing required field {key!r} (track {track.get('id')})",
+                    )
             for num in ("start", "duration", "in_point", "out_point"):
-                if num in clip and clip[num] is not None and not isinstance(clip[num], (int, float)):
+                if (
+                    num in clip
+                    and clip[num] is not None
+                    and not isinstance(clip[num], (int, float))
+                ):
                     _err(details, f"video clip field {num!r} must be numeric")
             transition = clip.get("transition")
-            if transition is not None:
-                if transition.get("type") not in TRANSITION_TYPES:
-                    _err(details, f"unknown transition type {transition.get('type')!r}")
+            if (
+                transition is not None
+                and transition.get("type") not in TRANSITION_TYPES
+            ):
+                _err(details, f"unknown transition type {transition.get('type')!r}")
 
     for track in data.get("audio_tracks", []) or []:
         if not isinstance(track, dict) or "id" not in track:
@@ -74,7 +86,11 @@ def validate_timeline(data):
                     _err(details, f"audio clip missing required field {key!r}")
 
     for caption in data.get("captions", []) or []:
-        if caption.get("start") is None or caption.get("end") is None or "text" not in caption:
+        if (
+            caption.get("start") is None
+            or caption.get("end") is None
+            or "text" not in caption
+        ):
             _err(details, "each caption needs start, end and text")
         elif caption["start"] >= caption["end"]:
             _err(details, "caption start must be before end")
@@ -100,6 +116,7 @@ def compute_incremental_plan(old_timeline, new_timeline):
     Only scenes whose clips changed (content, timing, or transitions) invalidate
     their intermediates; untouched clips keep their reusable assets.
     """
+
     def index(timeline):
         clips = {}
         for track in (timeline or {}).get("video_tracks", []) or []:
@@ -120,16 +137,20 @@ def compute_incremental_plan(old_timeline, new_timeline):
             if asset_id and asset_id not in reusable_assets:
                 reusable_assets.append(asset_id)
 
-    audio_changed = json.dumps((old_timeline or {}).get("audio_tracks"),
-                               sort_keys=True, default=str) != json.dumps(
-        (new_timeline or {}).get("audio_tracks"), sort_keys=True, default=str)
-    captions_changed = json.dumps((old_timeline or {}).get("captions"),
-                                  sort_keys=True, default=str) != json.dumps(
-        (new_timeline or {}).get("captions"), sort_keys=True, default=str)
+    audio_changed = json.dumps(
+        (old_timeline or {}).get("audio_tracks"), sort_keys=True, default=str
+    ) != json.dumps(
+        (new_timeline or {}).get("audio_tracks"), sort_keys=True, default=str
+    )
+    captions_changed = json.dumps(
+        (old_timeline or {}).get("captions"), sort_keys=True, default=str
+    ) != json.dumps((new_timeline or {}).get("captions"), sort_keys=True, default=str)
 
     stages = set()
     if changed_scenes:
-        stages.update(["scene_intermediates", "assemble_video", "encode", "validate", "preview"])
+        stages.update(
+            ["scene_intermediates", "assemble_video", "encode", "validate", "preview"]
+        )
     if audio_changed:
         stages.update(["mix_audio", "encode", "validate", "preview"])
     if captions_changed:
@@ -149,14 +170,20 @@ def _ffmpeg_version():
         return "ffmpeg-unavailable"
     try:
         out = subprocess.run(
-            [ffmpeg, "-version"], capture_output=True, text=True, timeout=10
+            [ffmpeg, "-version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         ).stdout
         return (out.splitlines() or ["ffmpeg"])[0].strip()[:200]
-    except Exception:
+    except Exception:  # noqa: BLE001 - ffmpeg probe must never crash; returns fallback string
         return "ffmpeg-unavailable"
 
 
-def build_render_manifest(asset_hashes, timeline_version_id, encoding_settings, validation):
+def build_render_manifest(
+    asset_hashes, timeline_version_id, encoding_settings, validation
+):
     """Build the immutable render manifest pinned to asset hashes + ffmpeg version."""
     return {
         "manifest_version": MANIFEST_VERSION,
@@ -186,12 +213,18 @@ def build_ffmpeg_command(inputs, output_path, encoding_settings=None, filters=No
     if filters:
         cmd += ["-filter_complex", filters]
     cmd += [
-        "-c:v", settings.get("video_codec", "libx264"),
-        "-preset", settings.get("preset", "medium"),
-        "-crf", str(settings.get("crf", 20)),
-        "-c:a", settings.get("audio_codec", "aac"),
-        "-b:a", settings.get("audio_bitrate", "192k"),
-        "-movflags", "+faststart",
+        "-c:v",
+        settings.get("video_codec", "libx264"),
+        "-preset",
+        settings.get("preset", "medium"),
+        "-crf",
+        str(settings.get("crf", 20)),
+        "-c:a",
+        settings.get("audio_codec", "aac"),
+        "-b:a",
+        settings.get("audio_bitrate", "192k"),
+        "-movflags",
+        "+faststart",
         output_path,
     ]
     return cmd
@@ -204,18 +237,32 @@ def ffprobe_validate(path):
         return {"valid": False, "error": "ffprobe-unavailable"}
     try:
         out = subprocess.run(
-            [ffprobe, "-v", "error", "-show_entries",
-             "stream=width,height,codec_name,codec_type,duration",
-             "-show_entries", "format=duration", "-of", "json", path],
-            capture_output=True, text=True, timeout=30,
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=width,height,codec_name,codec_type,duration",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         ).stdout
         probe = json.loads(out or "{}")
-    except Exception as exc:
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
         return {"valid": False, "error": f"ffprobe failed: {exc}"}
     streams = probe.get("streams", [])
     video = next((s for s in streams if s.get("codec_type") == "video"), {})
     audio = next((s for s in streams if s.get("codec_type") == "audio"), {})
-    duration = float((probe.get("format") or {}).get("duration") or video.get("duration") or 0)
+    duration = float(
+        (probe.get("format") or {}).get("duration") or video.get("duration") or 0
+    )
     result = {
         "valid": bool(video),
         "duration_seconds": duration,
@@ -232,10 +279,18 @@ class RenderWorker:
     """10-stage render pipeline: resolve→normalize→scene intermediates→assemble
     video→mix audio→captions/graphics→encode→validate→preview/thumbnail→manifest."""
 
-    STAGES = [
-        "resolve", "normalize", "scene_intermediates", "assemble_video", "mix_audio",
-        "captions_graphics", "encode", "validate", "preview", "store_manifest",
-    ]
+    STAGES = (
+        "resolve",
+        "normalize",
+        "scene_intermediates",
+        "assemble_video",
+        "mix_audio",
+        "captions_graphics",
+        "encode",
+        "validate",
+        "preview",
+        "store_manifest",
+    )
 
     def __init__(self, workdir="/tmp/tubeforge-renders"):
         self.workdir = workdir
@@ -272,8 +327,11 @@ class RenderWorker:
     def assemble_video(self, job, resolved):
         timeline = job.timeline_version.timeline_json
         inputs = [
-            {"path": resolved["resolved"][clip["asset_id"]],
-             "start": clip.get("in_point", 0), "duration": clip.get("duration")}
+            {
+                "path": resolved["resolved"][clip["asset_id"]],
+                "start": clip.get("in_point", 0),
+                "duration": clip.get("duration"),
+            }
             for track in timeline.get("video_tracks", []) or []
             for clip in track.get("clips", []) or []
         ]
@@ -282,7 +340,8 @@ class RenderWorker:
     def mix_audio(self, job, resolved):
         timeline = job.timeline_version.timeline_json
         clips = [
-            clip for track in timeline.get("audio_tracks", []) or []
+            clip
+            for track in timeline.get("audio_tracks", []) or []
             for clip in track.get("clips", []) or []
         ]
         return {"audio_clips": len(clips)}
@@ -296,9 +355,13 @@ class RenderWorker:
 
     def encode(self, job, inputs, output_path):
         cmd = build_ffmpeg_command(
-            inputs, output_path, (job.timeline_version.render_settings or {}).get("encoding", {})
+            inputs,
+            output_path,
+            (job.timeline_version.render_settings or {}).get("encoding", {}),
         )
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=3600, check=False
+        )
         if proc.returncode != 0:
             raise RuntimeError(f"ffmpeg failed: {proc.stderr[-2000:]}")
         return {"output_path": output_path, "command": " ".join(cmd[:6]) + " …"}
@@ -317,11 +380,15 @@ class RenderWorker:
         thumb = output_path + ".thumb.jpg"
         subprocess.run(
             [ffmpeg, "-y", "-i", output_path, "-t", "15", "-c", "copy", preview],
-            capture_output=True, timeout=300,
+            capture_output=True,
+            timeout=300,
+            check=False,
         )
         subprocess.run(
             [ffmpeg, "-y", "-ss", "2", "-i", output_path, "-frames:v", "1", thumb],
-            capture_output=True, timeout=300,
+            capture_output=True,
+            timeout=300,
+            check=False,
         )
         return {"preview": preview, "thumbnail": thumb}
 
@@ -329,12 +396,18 @@ class RenderWorker:
         from .models import Asset
 
         manifest = build_render_manifest(
-            asset_hashes, job.timeline_version_id,
-            (job.timeline_version.render_settings or {}).get("encoding", {}), validation,
+            asset_hashes,
+            job.timeline_version_id,
+            (job.timeline_version.render_settings or {}).get("encoding", {}),
+            validation,
         )
         output = Asset.objects.create(
-            project=job.project, asset_type="VIDEO", object_key=manifest_output_key(job),
-            mime_type="video/mp4", source_type="GENERATED", status="READY",
+            project=job.project,
+            asset_type="VIDEO",
+            object_key=manifest_output_key(job),
+            mime_type="video/mp4",
+            source_type="GENERATED",
+            status="READY",
             license_metadata={"origin": "tubeforge-render"},
             model_metadata={"renderer": manifest["renderer_version"]},
         )
@@ -363,10 +436,13 @@ class RenderWorker:
             self.encode(job, inputs, out_path)
             validation = self.validate_output(job, out_path, resolved)
             self.make_preview_thumbnail(job, out_path)
-            asset_hashes = {aid: _clip_signature({"key": key}) for aid, key in resolved["resolved"].items()}
+            asset_hashes = {
+                aid: _clip_signature({"key": key})
+                for aid, key in resolved["resolved"].items()
+            }
             self.store_manifest(job, asset_hashes, validation)
             job.status = "COMPLETED"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - render supervisor; one job must not kill the batch
             job.status = "FAILED"
             job.error = str(exc)[:2000]
         job.completed_at = timezone.now()

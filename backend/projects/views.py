@@ -1,20 +1,22 @@
 """Project views: CRUD, plan generation (no execution), scripts, scenes, timelines,
 renders, assets, and HMAC-signed upload URLs."""
+
 import hashlib
 import hmac
 import time
 import uuid
 from urllib.parse import quote
 
-from channels.models import Channel
-from core.utils import OwnsChannel, record_audit
 from django.conf import settings
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from channels.models import Channel
+from core.utils import OwnsChannel, record_audit
 
 from . import media_engine
 from .models import Asset, Project, RenderJob, Scene, ScriptVersion, TimelineVersion
@@ -29,10 +31,18 @@ from .serializers import (
 
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 ALLOWED_UPLOAD_MIMES = {
-    "image/png", "image/jpeg", "image/webp",
-    "video/mp4", "video/quicktime", "video/webm",
-    "audio/mpeg", "audio/wav", "audio/mp4",
-    "text/vtt", "text/plain", "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+    "audio/mpeg",
+    "audio/wav",
+    "audio/mp4",
+    "text/vtt",
+    "text/plain",
+    "application/pdf",
 }
 
 
@@ -47,10 +57,12 @@ def _owned_project(user, pk):
 # ---------------------------------------------------------------------------
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
-    permission_classes = [permissions.IsAuthenticated, OwnsChannel]
+    permission_classes = (permissions.IsAuthenticated, OwnsChannel)
 
     def get_queryset(self):
-        qs = Project.objects.filter(channel__owner=self.request.user).select_related("channel")
+        qs = Project.objects.filter(channel__owner=self.request.user).select_related(
+            "channel"
+        )
         channel_id = self.request.query_params.get("channel_id")
         if channel_id:
             qs = qs.filter(channel_id=channel_id)
@@ -62,20 +74,29 @@ class ProjectViewSet(viewsets.ModelViewSet):
         )
         project = serializer.save(channel=channel)
         record_audit(
-            self.request.user, "project.create", "project", str(project.id),
+            self.request.user,
+            "project.create",
+            "project",
+            str(project.id),
             request=self.request,
         )
 
     def perform_update(self, serializer):
         project = serializer.save()
         record_audit(
-            self.request.user, "project.update", "project", str(project.id),
+            self.request.user,
+            "project.update",
+            "project",
+            str(project.id),
             request=self.request,
         )
 
     def perform_destroy(self, instance):
         record_audit(
-            self.request.user, "project.delete", "project", str(instance.id),
+            self.request.user,
+            "project.delete",
+            "project",
+            str(instance.id),
             request=self.request,
         )
         instance.delete()
@@ -84,25 +105,41 @@ class ProjectViewSet(viewsets.ModelViewSet):
 class GeneratePlanView(APIView):
     """Validate inputs and return a structured production plan WITHOUT executing it."""
 
-    STAGES = [
-        "research", "script", "storyboard", "generate_assets", "generate_narration",
-        "assemble", "render", "validate", "final_review",
-    ]
+    STAGES = (
+        "research",
+        "script",
+        "storyboard",
+        "generate_assets",
+        "generate_narration",
+        "assemble",
+        "render",
+        "validate",
+        "final_review",
+    )
 
     def post(self, request, pk):
         project = _owned_project(request.user, pk)
-        target = int(request.data.get("target_duration_seconds") or project.target_duration_seconds)
+        target = int(
+            request.data.get("target_duration_seconds")
+            or project.target_duration_seconds
+        )
         fmt = request.data.get("format") or project.format
         if fmt not in ("LONG_FORM", "SHORT", "DOCUMENTARY", "EXPLAINER", "CINEMATIC"):
             raise ValidationError({"format": "Unsupported format."})
         if target <= 0 or target > 12 * 3600:
-            raise ValidationError({"target_duration_seconds": "Must be between 1 and 43200."})
+            raise ValidationError(
+                {"target_duration_seconds": "Must be between 1 and 43200."}
+            )
 
         scene_count = max(1, round(target / 8))
         estimated_minutes = round(target / 60 * 2.5, 1)
         plan = {
             "stages": [
-                {"name": stage, "order": i, "requires_approval": stage in ("script", "final_review")}
+                {
+                    "name": stage,
+                    "order": i,
+                    "requires_approval": stage in ("script", "final_review"),
+                }
                 for i, stage in enumerate(self.STAGES)
             ],
             "scene_count_estimate": scene_count,
@@ -117,12 +154,18 @@ class GeneratePlanView(APIView):
                 "method": "cost_heuristic_v1",
                 "disclaimer": "Heuristic estimate only; actual cost depends on provider routing and budgets.",
             },
-            "models": (project.channel.automation_config or {}).get("preferred_models", []),
+            "models": (project.channel.automation_config or {}).get(
+                "preferred_models", []
+            ),
             "approvals": ["script", "final_review"],
         }
         record_audit(
-            request.user, "project.generate_plan", "project", str(project.id),
-            request=request, metadata={"format": fmt, "target_duration_seconds": target},
+            request.user,
+            "project.generate_plan",
+            "project",
+            str(project.id),
+            request=request,
+            metadata={"format": fmt, "target_duration_seconds": target},
         )
         return Response(plan)
 
@@ -132,7 +175,7 @@ class GeneratePlanView(APIView):
 # ---------------------------------------------------------------------------
 class ScriptViewSet(viewsets.ModelViewSet):
     serializer_class = ScriptVersionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = (permissions.IsAuthenticated,)
 
     def _project(self):
         return _owned_project(self.request.user, self.kwargs["project_pk"])
@@ -145,8 +188,12 @@ class ScriptViewSet(viewsets.ModelViewSet):
         last = project.script_versions.aggregate(m=Max("version_number"))["m"] or 0
         script = serializer.save(project=project, version_number=last + 1)
         record_audit(
-            self.request.user, "script.create", "script", str(script.id),
-            request=self.request, metadata={"version": script.version_number},
+            self.request.user,
+            "script.create",
+            "script",
+            str(script.id),
+            request=self.request,
+            metadata={"version": script.version_number},
         )
 
     def approve(self, request, project_pk=None, pk=None):
@@ -165,8 +212,12 @@ class ScriptViewSet(viewsets.ModelViewSet):
             decision_reason=request.data.get("reason", ""),
         )
         record_audit(
-            request.user, "script.approve", "script", str(script.id),
-            request=request, metadata={"approval_id": str(approval.id)},
+            request.user,
+            "script.approve",
+            "script",
+            str(script.id),
+            request=request,
+            metadata={"approval_id": str(approval.id)},
         )
         return Response(ScriptVersionSerializer(script).data)
 
@@ -176,8 +227,8 @@ class ScriptViewSet(viewsets.ModelViewSet):
 # ---------------------------------------------------------------------------
 class SceneViewSet(viewsets.ModelViewSet):
     serializer_class = SceneSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ["get", "post", "patch", "delete"]
+    permission_classes = (permissions.IsAuthenticated,)
+    http_method_names = ("get", "post", "patch", "delete")
 
     def _project(self):
         return _owned_project(self.request.user, self.kwargs["project_pk"])
@@ -191,7 +242,11 @@ class SceneViewSet(viewsets.ModelViewSet):
         position = serializer.validated_data.get("position", (last or 0) + 1)
         scene = serializer.save(project=project, position=position)
         record_audit(
-            self.request.user, "scene.create", "scene", str(scene.id), request=self.request,
+            self.request.user,
+            "scene.create",
+            "scene",
+            str(scene.id),
+            request=self.request,
         )
 
     def generate(self, request, project_pk=None, pk=None):
@@ -201,10 +256,13 @@ class SceneViewSet(viewsets.ModelViewSet):
 
         scene = self.get_object()
         project = scene.project
-        task_type = "video" if scene.scene_type in ("CINEMATIC", "FACELESS") else "image"
+        task_type = (
+            "video" if scene.scene_type in ("CINEMATIC", "FACELESS") else "image"
+        )
         job = route_generation(
             task_type=task_type,
-            requirements=scene.generation_settings or {"duration_seconds": scene.duration_seconds},
+            requirements=scene.generation_settings
+            or {"duration_seconds": scene.duration_seconds},
             channel=project.channel,
             project=project,
             scene=scene,
@@ -216,10 +274,16 @@ class SceneViewSet(viewsets.ModelViewSet):
         scene.status = "GENERATING"
         scene.save(update_fields=["status", "updated_at"])
         record_audit(
-            request.user, "scene.generate", "scene", str(scene.id),
-            request=request, metadata={"job_id": str(job.id)},
+            request.user,
+            "scene.generate",
+            "scene",
+            str(scene.id),
+            request=request,
+            metadata={"job_id": str(job.id)},
         )
-        return Response(GenerationJobSerializer(job).data, status=status.HTTP_201_CREATED)
+        return Response(
+            GenerationJobSerializer(job).data, status=status.HTTP_201_CREATED
+        )
 
     def regenerate(self, request, project_pk=None, pk=None):
         """Reset a scene to PENDING, invalidating its dependent generated outputs."""
@@ -228,12 +292,16 @@ class SceneViewSet(viewsets.ModelViewSet):
         scene.save(update_fields=["status", "updated_at"])
         # Dependent generated assets for this scene are quarantined so the next
         # generate pass rebuilds only what this scene needs (incremental invalidation).
-        quarantined = scene.assets.filter(source_type="GENERATED", status="READY").update(
-            status="QUARANTINED"
-        )
+        quarantined = scene.assets.filter(
+            source_type="GENERATED", status="READY"
+        ).update(status="QUARANTINED")
         record_audit(
-            request.user, "scene.regenerate", "scene", str(scene.id),
-            request=request, metadata={"quarantined_assets": quarantined},
+            request.user,
+            "scene.regenerate",
+            "scene",
+            str(scene.id),
+            request=request,
+            metadata={"quarantined_assets": quarantined},
         )
         return Response({"status": scene.status, "quarantined_assets": quarantined})
 
@@ -246,7 +314,10 @@ class TimelineView(APIView):
         project = _owned_project(request.user, project_pk)
         latest = project.timeline_versions.first()
         if latest is None:
-            return Response({"detail": "No timeline versions yet."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "No timeline versions yet."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         return Response(TimelineVersionSerializer(latest).data)
 
     def post(self, request, project_pk):
@@ -264,10 +335,16 @@ class TimelineView(APIView):
             render_settings=request.data.get("render_settings", {}),
         )
         record_audit(
-            request.user, "timeline.create", "timeline", str(version.id),
-            request=request, metadata={"version": version.version_number},
+            request.user,
+            "timeline.create",
+            "timeline",
+            str(version.id),
+            request=request,
+            metadata={"version": version.version_number},
         )
-        return Response(TimelineVersionSerializer(version).data, status=status.HTTP_201_CREATED)
+        return Response(
+            TimelineVersionSerializer(version).data, status=status.HTTP_201_CREATED
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -275,14 +352,16 @@ class TimelineView(APIView):
 # ---------------------------------------------------------------------------
 class RenderJobViewSet(viewsets.ModelViewSet):
     serializer_class = RenderJobSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ["get", "post"]
+    permission_classes = (permissions.IsAuthenticated,)
+    http_method_names = ("get", "post")
 
     def _project(self):
         return _owned_project(self.request.user, self.kwargs["project_pk"])
 
     def get_queryset(self):
-        return RenderJob.objects.filter(project=self._project()).select_related("timeline_version")
+        return RenderJob.objects.filter(project=self._project()).select_related(
+            "timeline_version"
+        )
 
     def create(self, request, *args, **kwargs):
         project = self._project()
@@ -298,16 +377,24 @@ class RenderJobViewSet(viewsets.ModelViewSet):
             for a in project.assets.filter(status="READY")
         }
         manifest = media_engine.build_render_manifest(
-            asset_hashes, timeline_version.id,
-            request.data.get("encoding_settings", {}), {"timeline_valid": True},
+            asset_hashes,
+            timeline_version.id,
+            request.data.get("encoding_settings", {}),
+            {"timeline_valid": True},
         )
         job = RenderJob.objects.create(
-            project=project, timeline_version=timeline_version,
-            status="QUEUED", manifest=manifest,
+            project=project,
+            timeline_version=timeline_version,
+            status="QUEUED",
+            manifest=manifest,
         )
         record_audit(
-            request.user, "render.create", "render_job", str(job.id),
-            request=request, metadata={"timeline_version": timeline_version.version_number},
+            request.user,
+            "render.create",
+            "render_job",
+            str(job.id),
+            request=request,
+            metadata={"timeline_version": timeline_version.version_number},
         )
         return Response(RenderJobSerializer(job).data, status=status.HTTP_201_CREATED)
 
@@ -317,7 +404,11 @@ class RenderJobViewSet(viewsets.ModelViewSet):
             job.status = "CANCELED"
             job.save(update_fields=["status"])
             record_audit(
-                request.user, "render.cancel", "render_job", str(job.id), request=request,
+                request.user,
+                "render.cancel",
+                "render_job",
+                str(job.id),
+                request=request,
             )
         return Response(RenderJobSerializer(job).data)
 
@@ -327,12 +418,12 @@ class RenderJobViewSet(viewsets.ModelViewSet):
 # ---------------------------------------------------------------------------
 class AssetViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AssetSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        return Asset.objects.filter(project__channel__owner=self.request.user).select_related(
-            "project", "scene"
-        )
+        return Asset.objects.filter(
+            project__channel__owner=self.request.user
+        ).select_related("project", "scene")
 
 
 def sign_upload_url(object_key, expires_in=900):
@@ -346,7 +437,9 @@ def sign_upload_url(object_key, expires_in=900):
     """
     exp = int(time.time()) + int(expires_in)
     payload = f"{object_key}:{exp}"
-    sig = hmac.new(settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    sig = hmac.new(
+        settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()
     base = (settings.PUBLIC_APP_URL or "").rstrip("/")
     return {
         "upload_url": f"{base}/api/v1/assets/direct-upload?key={quote(object_key)}&exp={exp}&sig={sig}",
@@ -380,14 +473,22 @@ class UploadUrlView(APIView):
         if mime_type not in ALLOWED_UPLOAD_MIMES:
             raise ValidationError({"mime_type": f"Unsupported mime type: {mime_type}"})
         if size_bytes <= 0 or size_bytes > MAX_UPLOAD_BYTES:
-            raise ValidationError({"size_bytes": f"Must be between 1 and {MAX_UPLOAD_BYTES}."})
+            raise ValidationError(
+                {"size_bytes": f"Must be between 1 and {MAX_UPLOAD_BYTES}."}
+            )
         project_id = request.data.get("project_id")
         project = _owned_project(request.user, project_id) if project_id else None
-        safe_name = "".join(c for c in filename if c.isalnum() or c in ("-", "_", ".", "/"))[:200]
+        safe_name = "".join(
+            c for c in filename if c.isalnum() or c in ("-", "_", ".", "/")
+        )[:200]
         object_key = f"uploads/{request.user.id}/{uuid.uuid4().hex}/{safe_name}"
         signed = sign_upload_url(object_key)
         record_audit(
-            request.user, "asset.upload_url", "project", str(project.id) if project else "",
-            request=request, metadata={"mime_type": mime_type, "size_bytes": size_bytes},
+            request.user,
+            "asset.upload_url",
+            "project",
+            str(project.id) if project else "",
+            request=request,
+            metadata={"mime_type": mime_type, "size_bytes": size_bytes},
         )
         return Response({**signed, "mime_type": mime_type, "size_bytes": size_bytes})
