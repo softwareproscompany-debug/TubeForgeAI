@@ -4,6 +4,7 @@ Terminal states: PUBLISHED, FAILED, CANCELED. FAILED additionally allows a
 retry edge back to QUEUED. Late worker callbacks for terminal runs are ignored
 (see apply_worker_event).
 """
+
 from django.utils import timezone
 
 WORKFLOW_STATES = [
@@ -34,7 +35,13 @@ WORKFLOW_STATES = [
 TERMINAL_STATES = frozenset({"PUBLISHED", "FAILED", "CANCELED"})
 
 _NON_TERMINAL = [s for s in WORKFLOW_STATES if s not in TERMINAL_STATES]
-_PARKED = {"PAUSED", "CANCELED", "FAILED", "BLOCKED_ON_RESOURCES", "BLOCKED_ON_APPROVAL"}
+_PARKED = {
+    "PAUSED",
+    "CANCELED",
+    "FAILED",
+    "BLOCKED_ON_RESOURCES",
+    "BLOCKED_ON_APPROVAL",
+}
 
 
 def _build_transitions():
@@ -96,24 +103,34 @@ def transition(run, to_state, actor=None, request=None, event_type="state_change
         run.completed_at = now
     run.save()
     WorkflowEvent.objects.create(
-        run=run, event_type=event_type, stage=to_state,
+        run=run,
+        event_type=event_type,
+        stage=to_state,
         payload={"from": from_state, "to": to_state},
     )
     record_audit(
-        actor, "workflow.transition", "workflow_run", str(run.id),
-        request=request, metadata={"from": from_state, "to": to_state},
+        actor,
+        "workflow.transition",
+        "workflow_run",
+        str(run.id),
+        request=request,
+        metadata={"from": from_state, "to": to_state},
     )
     return run
 
 
-def apply_worker_event(run, to_state, event_type="worker_callback", payload=None, actor=None):
+def apply_worker_event(
+    run, to_state, event_type="worker_callback", payload=None, actor=None
+):
     """Apply a late worker callback. Terminal runs ignore it (returns False)."""
     from .models import WorkflowEvent
 
     run.refresh_from_db()
     if run.status in TERMINAL_STATES:
         WorkflowEvent.objects.create(
-            run=run, event_type="late_callback_ignored", stage=run.status,
+            run=run,
+            event_type="late_callback_ignored",
+            stage=run.status,
             payload={"attempted_to": to_state, "payload": payload or {}},
         )
         return False

@@ -1,4 +1,5 @@
 """Workflow serializers."""
+
 from rest_framework import serializers
 
 from .models import Approval, WorkflowEvent, WorkflowRun
@@ -7,13 +8,29 @@ from .models import Approval, WorkflowEvent, WorkflowRun
 class WorkflowRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowRun
-        fields = [
-            "id", "project", "workflow_type", "temporal_workflow_id", "status",
-            "current_stage", "input_snapshot", "output_summary",
-            "started_at", "completed_at", "created_at",
-        ]
-        read_only_fields = ["id", "temporal_workflow_id", "status", "current_stage",
-                            "output_summary", "started_at", "completed_at", "created_at"]
+        fields = (
+            "id",
+            "project",
+            "workflow_type",
+            "temporal_workflow_id",
+            "status",
+            "current_stage",
+            "input_snapshot",
+            "output_summary",
+            "started_at",
+            "completed_at",
+            "created_at",
+        )
+        read_only_fields = (
+            "id",
+            "temporal_workflow_id",
+            "status",
+            "current_stage",
+            "output_summary",
+            "started_at",
+            "completed_at",
+            "created_at",
+        )
 
 
 class WorkflowRunCreateSerializer(serializers.Serializer):
@@ -27,7 +44,7 @@ class WorkflowRunCreateSerializer(serializers.Serializer):
 class WorkflowEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowEvent
-        fields = ["id", "event_type", "stage", "payload", "occurred_at"]
+        fields = ("id", "event_type", "stage", "payload", "occurred_at")
         read_only_fields = fields
 
 
@@ -37,13 +54,26 @@ class ApprovalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Approval
-        fields = [
-            "id", "project", "workflow_run", "approval_type", "status",
-            "requested_by", "decided_by", "decision_reason",
-            "requested_at", "decided_at",
-        ]
-        read_only_fields = ["id", "status", "requested_by", "decided_by",
-                            "requested_at", "decided_at"]
+        fields = (
+            "id",
+            "project",
+            "workflow_run",
+            "approval_type",
+            "status",
+            "requested_by",
+            "decided_by",
+            "decision_reason",
+            "requested_at",
+            "decided_at",
+        )
+        read_only_fields = (
+            "id",
+            "status",
+            "requested_by",
+            "decided_by",
+            "requested_at",
+            "decided_at",
+        )
 
 
 class ApprovalDecideSerializer(serializers.Serializer):

@@ -3,6 +3,7 @@
 Usage: ``python manage.py temporal_worker``
 Requires a reachable Temporal server at settings.TEMPORAL_HOST.
 """
+
 from django.core.management.base import BaseCommand
 
 

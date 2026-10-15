@@ -1,23 +1,25 @@
 """Workflow views: run lifecycle, pause/resume/cancel/retry, events + SSE stream,
 approvals, and project workflow creation with Temporal-or-synchronous start."""
+
 import asyncio
 import json
 
-from core.utils import InvalidTransitionAPI, record_audit
 from django.conf import settings
 from django.db.models import Q
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from projects.models import Project
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.utils import InvalidTransitionAPI, record_audit
+from projects.models import Project
+
 from . import engine
-from .models import Approval, WorkflowEvent, WorkflowRun
+from .models import Approval, WorkflowRun
 from .serializers import (
     ApprovalDecideSerializer,
     ApprovalSerializer,
@@ -28,16 +30,25 @@ from .serializers import (
 from .temporal_workflows import TEMPORAL_AVAILABLE, build_workflow_id
 
 SYNC_FALLBACK_STAGES = [
-    "QUEUED", "RESEARCHING", "SCRIPTING", "STORYBOARDING", "GENERATING_ASSETS",
-    "GENERATING_NARRATION", "ASSEMBLING", "RENDERING", "VALIDATING",
-    "FINAL_REVIEW", "READY_TO_PUBLISH",
+    "QUEUED",
+    "RESEARCHING",
+    "SCRIPTING",
+    "STORYBOARDING",
+    "GENERATING_ASSETS",
+    "GENERATING_NARRATION",
+    "ASSEMBLING",
+    "RENDERING",
+    "VALIDATING",
+    "FINAL_REVIEW",
+    "READY_TO_PUBLISH",
 ]
 
 
 def _owned_run(user, pk):
     return get_object_or_404(
         WorkflowRun.objects.select_related("project__channel"),
-        pk=pk, project__channel__owner=user,
+        pk=pk,
+        project__channel__owner=user,
     )
 
 
@@ -52,7 +63,9 @@ def _start_temporal_workflow(run):
 
     async def _start():
         client = await asyncio.wait_for(
-            Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE),
+            Client.connect(
+                settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE
+            ),
             timeout=5,
         )
         handle = await client.start_workflow(
@@ -77,15 +90,19 @@ def _run_synchronous_stages(run, actor, request):
         run.refresh_from_db()
         if run.status in engine.TERMINAL_STATES:
             break
-        engine.transition(run, stage, actor=actor, request=request, event_type="sync_stage")
+        engine.transition(
+            run, stage, actor=actor, request=request, event_type="sync_stage"
+        )
         completed.append(stage)
     run.refresh_from_db()
     summary = dict(run.output_summary or {})
-    summary.update({
-        "execution_mode": "synchronous_fallback",
-        "temporal_unreachable": True,
-        "completed_stages": completed,
-    })
+    summary.update(
+        {
+            "execution_mode": "synchronous_fallback",
+            "temporal_unreachable": True,
+            "completed_stages": completed,
+        }
+    )
     run.output_summary = summary
     run.save(update_fields=["output_summary"])
     return completed
@@ -98,7 +115,9 @@ class ProjectWorkflowCreateView(APIView):
 
     def post(self, request, pk):
         project = get_object_or_404(
-            Project.objects.select_related("channel"), pk=pk, channel__owner=request.user
+            Project.objects.select_related("channel"),
+            pk=pk,
+            channel__owner=request.user,
         )
         serializer = WorkflowRunCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -119,29 +138,38 @@ class ProjectWorkflowCreateView(APIView):
         summary = dict(run.output_summary or {})
         try:
             handle_id = _start_temporal_workflow(run)
-            summary.update({"execution_mode": "temporal", "temporal_handle_id": handle_id})
-        except Exception as exc:
+            summary.update(
+                {"execution_mode": "temporal", "temporal_handle_id": handle_id}
+            )
+        except Exception as exc:  # noqa: BLE001 - temporal fallback; any failure uses synchronous mode
             completed = _run_synchronous_stages(run, request.user, request)
-            summary.update({
-                "execution_mode": "synchronous_fallback",
-                "temporal_unreachable": True,
-                "temporal_error": f"{type(exc).__name__}: {exc}"[:300],
-                "completed_stages": completed,
-            })
+            summary.update(
+                {
+                    "execution_mode": "synchronous_fallback",
+                    "temporal_unreachable": True,
+                    "temporal_error": f"{type(exc).__name__}: {exc}"[:300],
+                    "completed_stages": completed,
+                }
+            )
         run.output_summary = summary
         run.save(update_fields=["output_summary"])
         record_audit(
-            request.user, "workflow.create", "workflow_run", str(run.id),
+            request.user,
+            "workflow.create",
+            "workflow_run",
+            str(run.id),
             request=request,
-            metadata={"workflow_type": run.workflow_type,
-                      "execution_mode": summary.get("execution_mode")},
+            metadata={
+                "workflow_type": run.workflow_type,
+                "execution_mode": summary.get("execution_mode"),
+            },
         )
         return Response(WorkflowRunSerializer(run).data, status=status.HTTP_201_CREATED)
 
 
 class WorkflowRunViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = WorkflowRunSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         qs = WorkflowRun.objects.filter(
@@ -159,7 +187,10 @@ class WorkflowRunViewSet(viewsets.ReadOnlyModelViewSet):
         except engine.InvalidTransition as exc:
             raise InvalidTransitionAPI(str(exc)) from exc
         record_audit(
-            request.user, f"workflow.{action_name}", "workflow_run", str(run.id),
+            request.user,
+            f"workflow.{action_name}",
+            "workflow_run",
+            str(run.id),
             request=request,
         )
         return Response(WorkflowRunSerializer(run).data)
@@ -214,7 +245,7 @@ class WorkflowRunViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ApprovalViewSet(viewsets.ModelViewSet):
     serializer_class = ApprovalSerializer
-    http_method_names = ["get", "post"]
+    http_method_names = ("get", "post")
 
     def get_queryset(self):
         return Approval.objects.filter(
@@ -224,11 +255,16 @@ class ApprovalViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         project = get_object_or_404(
-            Project, pk=self.request.data.get("project"), channel__owner=self.request.user
+            Project,
+            pk=self.request.data.get("project"),
+            channel__owner=self.request.user,
         )
         approval = serializer.save(project=project, requested_by=self.request.user)
         record_audit(
-            self.request.user, "approval.request", "approval", str(approval.id),
+            self.request.user,
+            "approval.request",
+            "approval",
+            str(approval.id),
             request=self.request,
             metadata={"approval_type": approval.approval_type},
         )
@@ -237,19 +273,28 @@ class ApprovalViewSet(viewsets.ModelViewSet):
     def decide(self, request, pk=None):
         approval = get_object_or_404(
             Approval.objects.select_related("project__channel"),
-            pk=pk, project__channel__owner=request.user,
+            pk=pk,
+            project__channel__owner=request.user,
         )
         if approval.status != "PENDING":
             raise ValidationError({"detail": "This approval has already been decided."})
         serializer = ApprovalDecideSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        approval.status = "APPROVED" if serializer.validated_data["decision"] == "approved" else "REJECTED"
+        approval.status = (
+            "APPROVED"
+            if serializer.validated_data["decision"] == "approved"
+            else "REJECTED"
+        )
         approval.decided_by = request.user
         approval.decision_reason = serializer.validated_data.get("reason", "")
         approval.decided_at = timezone.now()
         approval.save()
         record_audit(
-            request.user, "approval.decide", "approval", str(approval.id),
-            request=request, metadata={"status": approval.status},
+            request.user,
+            "approval.decide",
+            "approval",
+            str(approval.id),
+            request=request,
+            metadata={"status": approval.status},
         )
         return Response(ApprovalSerializer(approval).data)

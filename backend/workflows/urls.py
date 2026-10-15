@@ -1,4 +1,5 @@
 """Workflow URL routes."""
+
 from django.urls import path
 
 from .views import ApprovalViewSet, WorkflowRunViewSet
@@ -23,7 +24,9 @@ urlpatterns = [
     path("workflows/<uuid:pk>/cancel", run_cancel, name="workflow-cancel"),
     path("workflows/<uuid:pk>/retry", run_retry, name="workflow-retry"),
     path("workflows/<uuid:pk>/events", run_events, name="workflow-events"),
-    path("workflows/<uuid:pk>/events/stream", run_stream, name="workflow-events-stream"),
+    path(
+        "workflows/<uuid:pk>/events/stream", run_stream, name="workflow-events-stream"
+    ),
     path("approvals", approval_list, name="approval-list"),
     path("approvals/<uuid:pk>", approval_detail, name="approval-detail"),
     path("approvals/<uuid:pk>/decide", approval_decide, name="approval-decide"),

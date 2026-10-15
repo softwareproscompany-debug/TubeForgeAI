@@ -5,6 +5,7 @@ no-op decorator shims keep this module importable (the synchronous fallback
 runner in views is used instead). Install ``temporalio`` and point
 TEMPORAL_HOST at a live server for durable execution.
 """
+
 from datetime import timedelta
 
 try:
@@ -80,7 +81,9 @@ class VideoProductionWorkflow:
                 args=[run_id, project_id],
                 start_to_close_timeout=timedelta(minutes=30),
                 heartbeat_timeout=timedelta(minutes=2),
-                retry_policy=RetryPolicy(maximum_attempts=5, initial_interval=timedelta(seconds=10)),
+                retry_policy=RetryPolicy(
+                    maximum_attempts=5, initial_interval=timedelta(seconds=10)
+                ),
             )
             # Checkpoint after each stage (scene-level checkpointing happens
             # inside generate_assets_stage).
