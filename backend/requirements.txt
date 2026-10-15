@@ -7,3 +7,5 @@ redis
 temporalio
 pytest
 pytest-django
+gunicorn
+whitenoise
