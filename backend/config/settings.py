@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "core",
+    "billing",
     "channels",
     "research",
     "projects",
@@ -168,6 +169,13 @@ YOUTUBE_REDIRECT_URI = env("YOUTUBE_REDIRECT_URI", "")
 FRONTEND_URL = env("FRONTEND_URL", "")
 PUBLIC_APP_URL = env("PUBLIC_APP_URL", "")
 
+# Stripe (billing). All keys are optional in dev: when STRIPE_SECRET_KEY is
+# unset the billing views serve stub sessions and skip signature checks.
+# Going live: set these + stripe price IDs on the SubscriptionTier rows.
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", "")
+
 S3_ENDPOINT = env("S3_ENDPOINT", "")
 S3_ACCESS_KEY = env("S3_ACCESS_KEY", "")
 S3_SECRET_KEY = env("S3_SECRET_KEY", "")
@@ -175,6 +183,15 @@ S3_BUCKET = env("S3_BUCKET", "")
 S3_REGION = env("S3_REGION", "us-east-1")
 
 AI_WORKER_CONCURRENCY = int(env("AI_WORKER_CONCURRENCY", "2"))
+
+# --- WebAuthn / passkeys -----------------------------------------------------
+WEBAUTHN_RP_NAME = "TubeForge AI"
+WEBAUTHN_RP_ID = env(
+    "WEBAUTHN_RP_ID", "localhost" if DEBUG else "tubeforge.aixentium.com"
+)
+# Explicit expected origin (e.g. "https://tubeforge.aixentium.com"). When empty,
+# the origin is built from the incoming request's scheme + host.
+WEBAUTHN_ORIGIN = env("WEBAUTHN_ORIGIN", "")
 
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},

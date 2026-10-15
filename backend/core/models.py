@@ -107,3 +107,27 @@ class SystemSetting(UUIDModel):
 
     def __str__(self):
         return self.key
+
+
+class WebAuthnCredential(UUIDModel):
+    """A registered passkey/WebAuthn credential for a user.
+
+    ``credential_id`` is the base64url-encoded raw credential id returned by
+    the authenticator; ``public_key`` is the raw COSE public key bytes used to
+    verify future assertions.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="webauthn_credentials"
+    )
+    credential_id = models.TextField(unique=True)
+    public_key = models.BinaryField()
+    sign_count = models.IntegerField(default=0)
+    name = models.CharField(max_length=255, default="Passkey")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user}:{self.name}"
