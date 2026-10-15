@@ -69,7 +69,8 @@ export default function RegisterPage() {
       // so the user is signed in immediately.
       await register(username.trim(), email.trim(), password);
       setDone(true);
-      redirectTimer.current = setTimeout(() => router.push("/overview"), 1200);
+      // New accounts go through the onboarding wizard first.
+      redirectTimer.current = setTimeout(() => router.push("/onboarding"), 1200);
     } catch (err) {
       setError(
         err instanceof ApiError

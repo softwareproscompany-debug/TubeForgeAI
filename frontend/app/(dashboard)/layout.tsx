@@ -3,8 +3,13 @@
 // guard — public routes (/login, /register, /forgot-password) are untouched.
 
 import type { ReactNode } from "react";
+import OnboardingGate from "../../components/OnboardingGate";
 import ProtectedRoute from "../../components/ProtectedRoute";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return <ProtectedRoute>{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute>
+      <OnboardingGate>{children}</OnboardingGate>
+    </ProtectedRoute>
+  );
 }

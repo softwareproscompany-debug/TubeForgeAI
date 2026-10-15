@@ -424,3 +424,22 @@ export interface UserSubscription {
   created_at: string;
   updated_at: string;
 }
+
+export type OnboardingStep = "welcome" | "youtube" | "channel_setup" | "first_project";
+
+export interface OnboardingProgress {
+  id: string;
+  current_step: OnboardingStep;
+  completed_steps: OnboardingStep[];
+  skipped: boolean;
+  is_complete: boolean;
+  started_at: string;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface ChannelConnectResponse {
+  channel_id: string;
+  authorization_url: string;
+  state: string;
+}
