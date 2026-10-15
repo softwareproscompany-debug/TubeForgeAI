@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Django management entry point for TubeForge AI."""
+"""Django management entry point for TubeForge AI.
+
+This module exposes Django's manage.py entry point used to run management
+commands (runserver, migrate, etc.) for the TubeForge AI backend.
+"""
 
 import os
 import sys
