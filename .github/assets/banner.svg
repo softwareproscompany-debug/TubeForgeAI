@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-label="TubeForge AI banner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050816"/>
+      <stop offset="0.55" stop-color="#0b1030"/>
+      <stop offset="1" stop-color="#141a3d"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22d3ee">
+        <animate attributeName="stop-color" values="#22d3ee;#a78bfa;#fb7185;#22d3ee" dur="8s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="55%" stop-color="#a78bfa">
+        <animate attributeName="stop-color" values="#a78bfa;#fb7185;#22d3ee;#a78bfa" dur="8s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#fb7185">
+        <animate attributeName="stop-color" values="#fb7185;#22d3ee;#a78bfa;#fb7185" dur="8s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowP" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="400" fill="url(#bg)"/>
+  <rect width="1280" height="400" fill="url(#grid)"/>
+  <ellipse cx="220" cy="120" rx="320" ry="180" fill="url(#glow)"/>
+  <ellipse cx="1060" cy="290" rx="340" ry="190" fill="url(#glowP)"/>
+
+  <!-- left: wordmark -->
+  <g font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+    <text x="72" y="158" font-size="30" font-weight="600" fill="#7dd3fc" letter-spacing="6">
+      TUBEFORGE
+      <animate attributeName="opacity" values="1;0.75;1" dur="4s" repeatCount="indefinite"/>
+    </text>
+    <text x="68" y="238" font-size="88" font-weight="800" fill="url(#titleGrad)" letter-spacing="2">TubeForge AI</text>
+    <text x="72" y="286" font-size="24" fill="#c4b5fd" opacity="0.95">The AI-Powered YouTube Operating System</text>
+    <text x="72" y="322" font-size="16" fill="#64748b">research &#8594; script &#8594; scenes &#8594; narration &#8594; visuals &#8594; assembly &#8594; publish &#8594; analytics</text>
+  </g>
+
+  <!-- right: animated pipeline nodes -->
+  <g>
+    <!-- connectors with flowing dashes -->
+    <line x1="880" y1="200" x2="960" y2="200" stroke="#22d3ee" stroke-width="3" stroke-dasharray="10 8" opacity="0.8">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="1000" y1="200" x2="1080" y2="200" stroke="#a78bfa" stroke-width="3" stroke-dasharray="10 8" opacity="0.8">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.2s" begin="0.2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="1120" y1="200" x2="1200" y2="200" stroke="#fb7185" stroke-width="3" stroke-dasharray="10 8" opacity="0.8">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.2s" begin="0.4s" repeatCount="indefinite"/>
+    </line>
+
+    <!-- nodes -->
+    <g>
+      <circle cx="860" cy="200" r="26" fill="#0e7490" opacity="0.35"/>
+      <circle cx="860" cy="200" r="18" fill="none" stroke="#22d3ee" stroke-width="3">
+        <animate attributeName="r" values="18;21;18" dur="2.4s" repeatCount="indefinite"/>
+      </circle>
+      <text x="860" y="252" text-anchor="middle" font-size="15" fill="#a5f3fc" font-family="sans-serif">Research</text>
+    </g>
+    <g>
+      <circle cx="980" cy="200" r="26" fill="#7c3aed" opacity="0.35"/>
+      <circle cx="980" cy="200" r="18" fill="none" stroke="#a78bfa" stroke-width="3">
+        <animate attributeName="r" values="18;21;18" dur="2.4s" begin="0.4s" repeatCount="indefinite"/>
+      </circle>
+      <text x="980" y="252" text-anchor="middle" font-size="15" fill="#ddd6fe" font-family="sans-serif">Generate</text>
+    </g>
+    <g>
+      <circle cx="1100" cy="200" r="26" fill="#be123c" opacity="0.35"/>
+      <circle cx="1100" cy="200" r="18" fill="none" stroke="#fb7185" stroke-width="3">
+        <animate attributeName="r" values="18;21;18" dur="2.4s" begin="0.8s" repeatCount="indefinite"/>
+      </circle>
+      <text x="1100" y="252" text-anchor="middle" font-size="15" fill="#fecdd3" font-family="sans-serif">Assemble</text>
+    </g>
+    <g>
+      <circle cx="1220" cy="200" r="26" fill="#15803d" opacity="0.4"/>
+      <circle cx="1220" cy="200" r="18" fill="none" stroke="#4ade80" stroke-width="3">
+        <animate attributeName="r" values="18;21;18" dur="2.4s" begin="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <text x="1220" y="252" text-anchor="middle" font-size="15" fill="#bbf7d0" font-family="sans-serif">Publish</text>
+    </g>
+  </g>
+
+  <!-- bottom accent bar -->
+  <rect x="0" y="392" width="1280" height="8" fill="url(#titleGrad)"/>
+</svg>

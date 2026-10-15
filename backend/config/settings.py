@@ -26,8 +26,19 @@ def env_bool(name, default="False"):
     return str(env(name, default)).lower() in ("1", "true", "yes", "on")
 
 
-SECRET_KEY = env("SECRET_KEY", required=True)
-FERNET_KEY = env("FERNET_KEY", required=True)
+TESTING = env_bool("TESTING", "False")
+
+# In test mode (pytest, CI), allow throwaway defaults so the test runner can
+# import settings before conftest.py sets real env vars. Production still
+# requires real secrets (fail fast).
+if TESTING:
+    SECRET_KEY = env(
+        "SECRET_KEY", "test-secret-key-0123456789abcdef-not-for-production"
+    )
+    FERNET_KEY = env("FERNET_KEY", Fernet.generate_key().decode())
+else:
+    SECRET_KEY = env("SECRET_KEY", required=True)
+    FERNET_KEY = env("FERNET_KEY", required=True)
 try:
     Fernet(FERNET_KEY.encode() if isinstance(FERNET_KEY, str) else FERNET_KEY)
 except (TypeError, ValueError) as exc:  # pragma: no cover - startup guard
@@ -37,7 +48,6 @@ DEBUG = env_bool("DEBUG", "False")
 ALLOWED_HOSTS = [
     h.strip() for h in env("ALLOWED_HOSTS", "localhost").split(",") if h.strip()
 ]
-TESTING = env_bool("TESTING", "False")
 
 
 def _database_config():

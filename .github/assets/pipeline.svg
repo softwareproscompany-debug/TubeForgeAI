@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" width="1280" height="300" role="img" aria-label="TubeForge AI pipeline overview">
+  <defs>
+    <linearGradient id="pbg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0b1030"/>
+      <stop offset="1" stop-color="#101736"/>
+    </linearGradient>
+    <linearGradient id="barA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="barB" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="barC" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="barD" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="300" rx="16" fill="url(#pbg)" stroke="#1e293b" stroke-width="1"/>
+  <text x="40" y="44" font-size="20" font-weight="700" fill="#e2e8f0" font-family="sans-serif" letter-spacing="3">PRODUCTION PIPELINE &#8212; 22 DURABLE STATES</text>
+
+  <!-- stat blocks with animated bars -->
+  <g font-family="sans-serif">
+    <!-- block 1 -->
+    <text x="40" y="92" font-size="15" fill="#7dd3fc">AI PROVIDER GATEWAY</text>
+    <text x="40" y="122" font-size="34" font-weight="800" fill="#ffffff">4</text>
+    <text x="78" y="122" font-size="16" fill="#64748b">adapter types</text>
+    <rect x="40" y="136" width="260" height="10" rx="5" fill="#1e293b"/>
+    <rect x="40" y="136" width="260" height="10" rx="5" fill="url(#barA)">
+      <animate attributeName="width" values="0;260" dur="1.6s" fill="freeze"/>
+    </rect>
+    <text x="40" y="168" font-size="13" fill="#475569">ComfyUI &#183; OpenAI-compatible &#183; local inference &#183; external API</text>
+
+    <!-- block 2 -->
+    <text x="370" y="92" font-size="15" fill="#c4b5fd">WORKFLOW ENGINE</text>
+    <text x="370" y="122" font-size="34" font-weight="800" fill="#ffffff">22</text>
+    <text x="418" y="122" font-size="16" fill="#64748b">states &#183; Temporal</text>
+    <rect x="370" y="136" width="260" height="10" rx="5" fill="#1e293b"/>
+    <rect x="370" y="136" width="260" height="10" rx="5" fill="url(#barB)">
+      <animate attributeName="width" values="0;260" dur="1.6s" begin="0.2s" fill="freeze"/>
+    </rect>
+    <text x="370" y="168" font-size="13" fill="#475569">durable &#183; resumable &#183; scene-level checkpoints</text>
+
+    <!-- block 3 -->
+    <text x="700" y="92" font-size="15" fill="#fda4af">MEDIA ENGINE</text>
+    <text x="700" y="122" font-size="34" font-weight="800" fill="#ffffff">10</text>
+    <text x="748" y="122" font-size="16" fill="#64748b">stage FFmpeg pipeline</text>
+    <rect x="700" y="136" width="260" height="10" rx="5" fill="#1e293b"/>
+    <rect x="700" y="136" width="260" height="10" rx="5" fill="url(#barC)">
+      <animate attributeName="width" values="0;260" dur="1.6s" begin="0.4s" fill="freeze"/>
+    </rect>
+    <text x="700" y="168" font-size="13" fill="#475569">assembly &#183; transcoding &#183; thumbnails &#183; validation</text>
+
+    <!-- block 4 -->
+    <text x="1030" y="92" font-size="15" fill="#86efac">FRONTEND</text>
+    <text x="1030" y="122" font-size="34" font-weight="800" fill="#ffffff">15</text>
+    <text x="1078" y="122" font-size="16" fill="#64748b">sections</text>
+    <rect x="1030" y="136" width="210" height="10" rx="5" fill="#1e293b"/>
+    <rect x="1030" y="136" width="210" height="10" rx="5" fill="url(#barD)">
+      <animate attributeName="width" values="0;210" dur="1.6s" begin="0.6s" fill="freeze"/>
+    </rect>
+    <text x="1030" y="168" font-size="13" fill="#475569">Next.js &#183; React &#183; TypeScript &#183; Tailwind</text>
+  </g>
+
+  <!-- bottom strip: guarantees -->
+  <g font-family="sans-serif" font-size="14" fill="#94a3b8">
+    <circle cx="52" cy="228" r="5" fill="#22d3ee"/>
+    <text x="66" y="233">Local-first routing</text>
+    <circle cx="262" cy="228" r="5" fill="#a78bfa"/>
+    <text x="276" y="233">No per-generation credits</text>
+    <circle cx="502" cy="228" r="5" fill="#fb7185"/>
+    <text x="516" y="233">Idempotent publishing</text>
+    <circle cx="722" cy="228" r="5" fill="#4ade80"/>
+    <text x="736" y="233">Server-side budgets</text>
+    <circle cx="942" cy="228" r="5" fill="#fbbf24"/>
+    <text x="956" y="233">Traceable assets</text>
+  </g>
+  <text x="40" y="272" font-size="13" fill="#334155" font-family="sans-serif">Django 5 &#183; DRF &#183; PostgreSQL 16 &#183; Redis 7 &#183; Temporal &#183; FFmpeg &#183; YouTube Data API v3</text>
+</svg>

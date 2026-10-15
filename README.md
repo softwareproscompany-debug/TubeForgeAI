@@ -1,14 +1,46 @@
-# TubeForge AI
+<div align="center">
+  <img src=".github/assets/banner.svg" alt="TubeForge AI — The AI-Powered YouTube Operating System" width="100%" />
+</div>
 
-**Private AI-powered YouTube operating system.** Describe a content goal; TubeForge
-orchestrates the entire production lifecycle — research → script → scenes →
-narration → AI visuals → FFmpeg assembly → thumbnail/SEO metadata → approval →
-publish → analytics — across multiple connected YouTube channels.
+<div align="center">
 
-Built as a **modular monolith** (per the product spec's final architectural decision):
-deterministic workflow stages with bounded AI autonomy. The AI proposes content,
-scenes, and models; the application owns authorization, budgets, state
-transitions, resource allocation, and publication permissions.
+[![CI](https://github.com/softwareproscompany-debug/TubeForgeAI/actions/workflows/ci.yml/badge.svg)](https://github.com/softwareproscompany-debug/TubeForgeAI/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-5-092E20?style=flat-square&logo=django&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Temporal](https://img.shields.io/badge/Temporal-durable-7C3AED?style=flat-square)
+![FFmpeg](https://img.shields.io/badge/FFmpeg-media_engine-007808?style=flat-square)
+![License](https://img.shields.io/badge/license-private-lightgrey?style=flat-square)
+
+**Describe a content goal; TubeForge orchestrates the entire production lifecycle.**
+
+</div>
+
+<div align="center">
+  <img src=".github/assets/pipeline.svg" alt="TubeForge AI production pipeline overview" width="100%" />
+</div>
+
+## Architecture
+
+```mermaid
+flowchart TB
+    Browser["Browser<br/>Next.js 14 / React / TS / Tailwind<br/>15 sections"] --> API["Django 5 + DRF<br/>/api/v1 — 7 apps"]
+    API --> PG[("PostgreSQL 16<br/>UUID PKs, UTC")]
+    API --> Redis[("Redis 7<br/>cache / throttle")]
+    API --> Temporal["Temporal<br/>22-state engine"]
+    API --> Workers["render_worker<br/>FFmpeg 10-stage"]
+    API --> Gateway["AI Provider Gateway<br/>local-first router"]
+    Gateway --> ComfyUI["ComfyUI / local inference<br/>GPU profile"]
+    Gateway --> Cloud["Cloud / external APIs<br/>budget-gated"]
+    API --> YT["YouTube Data API v3<br/>idempotent publish"]
+    API --> MinIO[("MinIO<br/>S3 object storage")]
+    style Browser fill:#0ea5e9,stroke:#0369a1,color:#fff
+    style API fill:#092E20,stroke:#16a34a,color:#fff
+    style Gateway fill:#7c3aed,stroke:#5b21b6,color:#fff
+    style YT fill:#dc2626,stroke:#991b1b,color:#fff
+```
 
 ## Core guarantees
 
@@ -30,42 +62,18 @@ transitions, resource allocation, and publication permissions.
 - **Budget enforcement is server-side** — global → channel → project → workflow
   hierarchy, evaluated before any paid submit.
 
-## Architecture
-
-```
-Browser
-  │  Next.js 14 / React / TypeScript / Tailwind  (frontend/)
-  │        ┌──────────────────── 15 sections: Overview, AI Command Center,
-  │        │   Channels, Research, Content Calendar, Projects, Production Queue,
-  │        │   Media Library, Video Editor, Publishing, Analytics,
-  │        │   AI Models & Providers, Automation Workflows, System Health, Settings
-  ▼
-Caddy (reverse proxy, TLS, security headers)            (infra/Caddyfile)
-  │  /api/* ──► Django 5 + DRF  /api/v1  (backend/)
-  │              ├─ core        auth, users, secrets (Fernet), audit, notifications
-  │              ├─ channels    channel records, OAuth, automation rules
-  │              ├─ research    research runs, sources, content ideas
-  │              ├─ projects    projects, scripts, scenes, assets, timelines, renders
-  │              ├─ providers   registry, local-first router, budgets, usage ledger
-  │              ├─ workflows   22-state engine, Temporal workflows + activities
-  │              └─ publishing  YouTube client, upload state machine, analytics
-  │
-  ├─ PostgreSQL 16 (UUID PKs, UTC timestamps)      ◄── internal only
-  ├─ Redis 7 (cache / throttling)                  ◄── internal only
-  ├─ Temporal server + temporal_worker              ◄── internal only
-  ├─ render_worker  (FFmpeg 10-stage pipeline)      ◄── internal only
-  ├─ ai_gateway     (provider job reconciliation)   ◄── internal only
-  ├─ MinIO (S3-compatible object storage)           ◄── internal only
-  │
-  └─ AI Provider Gateway ──┬── local ComfyUI / inference (GPU profile, optional)
-                           ├── cloud GPU workers (optional)
-                           └── external APIs (explicit approval only)
-```
+## Deployment notes
 
 Only Caddy publishes host ports. Postgres/Redis/Temporal/MinIO are never
 exposed publicly. GPU services start only with `docker compose --profile gpu up`;
 without them the app runs fully — generation jobs queue as
 `BLOCKED_ON_RESOURCES` instead of failing.
+
+Backend apps: `core` (auth, users, secrets, audit), `channels` (records, OAuth,
+automation rules), `research` (runs, sources, ideas), `projects` (scripts, scenes,
+assets, timelines, renders), `providers` (registry, local-first router, budgets,
+ledger), `workflows` (22-state engine, Temporal), `publishing` (YouTube client,
+upload state machine, analytics).
 
 ## Repository layout
 
