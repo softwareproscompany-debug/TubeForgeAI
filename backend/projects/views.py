@@ -16,6 +16,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from billing.limits import check_limit
 from channels.models import Channel
 from core.utils import (
     BudgetExceededAPI,
@@ -77,6 +78,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        # Free-tier project cap (402 TIER_LIMIT_EXCEEDED when exhausted).
+        check_limit(self.request.user, "projects")
         channel = get_object_or_404(
             Channel, pk=self.request.data.get("channel"), owner=self.request.user
         )
