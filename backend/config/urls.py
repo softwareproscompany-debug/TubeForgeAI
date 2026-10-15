@@ -12,4 +12,5 @@ urlpatterns = [
     path("api/v1/", include("workflows.urls")),
     path("api/v1/", include("publishing.urls")),
     path("api/v1/", include("onboarding.urls")),
+    path("api/v1/", include("swarm.urls")),
 ]
