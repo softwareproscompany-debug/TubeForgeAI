@@ -1,18 +1,20 @@
 """Provider views: CRUD, health checks, test generations, job routing, usage, budgets."""
+
 import asyncio
+
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from core.utils import (
     BudgetExceededAPI,
     PaidFallbackApprovalRequiredAPI,
     record_audit,
 )
-from django.db.models import Q
-from django.shortcuts import get_object_or_404
 from projects.models import Project, Scene
-from rest_framework import generics, permissions, status, viewsets
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
-from rest_framework.response import Response
 
 from . import gateway
 from .models import AIModel, Budget, GenerationJob, Provider, ResourceUsageEvent
@@ -36,14 +38,20 @@ class ProviderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         provider = serializer.save()
         record_audit(
-            self.request.user, "provider.create", "provider", str(provider.id),
+            self.request.user,
+            "provider.create",
+            "provider",
+            str(provider.id),
             request=self.request,
         )
 
     def perform_update(self, serializer):
         provider = serializer.save()
         record_audit(
-            self.request.user, "provider.update", "provider", str(provider.id),
+            self.request.user,
+            "provider.update",
+            "provider",
+            str(provider.id),
             request=self.request,
         )
 
@@ -55,8 +63,12 @@ class ProviderViewSet(viewsets.ModelViewSet):
         provider.health_status = result.get("status", "UNKNOWN")
         provider.save(update_fields=["health_status", "updated_at"])
         record_audit(
-            request.user, "provider.health_check", "provider", str(provider.id),
-            request=request, metadata={"status": provider.health_status},
+            request.user,
+            "provider.health_check",
+            "provider",
+            str(provider.id),
+            request=request,
+            metadata={"status": provider.health_status},
         )
         return Response({"provider_id": str(provider.id), **result})
 
@@ -67,11 +79,13 @@ class ProviderViewSet(viewsets.ModelViewSet):
         adapter = gateway.get_adapter(provider)
         capabilities = asyncio.run(adapter.capabilities())
         health = asyncio.run(adapter.health_check())
-        return Response({
-            "provider_id": str(provider.id),
-            "capabilities": capabilities,
-            "health": health,
-        })
+        return Response(
+            {
+                "provider_id": str(provider.id),
+                "capabilities": capabilities,
+                "health": health,
+            }
+        )
 
 
 class AIModelViewSet(viewsets.ModelViewSet):
@@ -87,7 +101,7 @@ class AIModelViewSet(viewsets.ModelViewSet):
 
 class GenerationJobViewSet(viewsets.ModelViewSet):
     serializer_class = GenerationJobSerializer
-    http_method_names = ["get", "post"]
+    http_method_names = ("get", "post")
 
     def get_queryset(self):
         return GenerationJob.objects.filter(
@@ -118,7 +132,9 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         if idempotency_key:
             # Idempotent submit: a duplicate key returns the existing job (HTTP 200),
             # never a second job.
-            existing = GenerationJob.objects.filter(idempotency_key=idempotency_key).first()
+            existing = GenerationJob.objects.filter(
+                idempotency_key=idempotency_key
+            ).first()
             if existing is not None:
                 return Response(GenerationJobSerializer(existing).data)
         try:
@@ -142,10 +158,16 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         except gateway.ProviderError as exc:
             raise ValidationError({"detail": f"{exc.code}: {exc}"}) from exc
         record_audit(
-            request.user, "generation.create", "generation_job", str(job.id),
-            request=request, metadata={"task_type": task_type},
+            request.user,
+            "generation.create",
+            "generation_job",
+            str(job.id),
+            request=request,
+            metadata={"task_type": task_type},
         )
-        return Response(GenerationJobSerializer(job).data, status=status.HTTP_201_CREATED)
+        return Response(
+            GenerationJobSerializer(job).data, status=status.HTTP_201_CREATED
+        )
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
@@ -153,13 +175,18 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         if job.status in ("QUEUED", "RUNNING"):
             if job.external_job_id:
                 try:
-                    asyncio.run(gateway.get_adapter(job.provider).cancel(job.external_job_id))
+                    asyncio.run(
+                        gateway.get_adapter(job.provider).cancel(job.external_job_id)
+                    )
                 except gateway.ProviderError:
                     pass  # cancel is best-effort against the provider
             job.status = "CANCELED"
             job.save(update_fields=["status"])
             record_audit(
-                request.user, "generation.cancel", "generation_job", str(job.id),
+                request.user,
+                "generation.cancel",
+                "generation_job",
+                str(job.id),
                 request=request,
             )
         return Response(GenerationJobSerializer(job).data)
@@ -169,12 +196,17 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         """Record finished outputs (used by polling loops / provider webhooks)."""
         job = self.get_object()
         assets = gateway.complete_job(
-            job, request.data.get("outputs", []),
+            job,
+            request.data.get("outputs", []),
             actual_cost=request.data.get("actual_cost"),
         )
         record_audit(
-            request.user, "generation.complete", "generation_job", str(job.id),
-            request=request, metadata={"assets": len(assets)},
+            request.user,
+            "generation.complete",
+            "generation_job",
+            str(job.id),
+            request=request,
+            metadata={"assets": len(assets)},
         )
         return Response(GenerationJobSerializer(job).data)
 
@@ -200,13 +232,11 @@ class ResourceUsageListView(generics.ListAPIView):
 
 class BudgetViewSet(viewsets.ModelViewSet):
     serializer_class = BudgetSerializer
-    http_method_names = ["get", "post", "patch", "put", "delete"]
+    http_method_names = ("get", "post", "patch", "put", "delete")
 
     def get_queryset(self):
         user = self.request.user
-        channel_ids = list(
-            user.channels.values_list("id", flat=True)
-        )
+        channel_ids = list(user.channels.values_list("id", flat=True))
         project_ids = list(
             Project.objects.filter(channel__owner=user).values_list("id", flat=True)
         )
@@ -219,7 +249,10 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         budget = serializer.save()
         record_audit(
-            self.request.user, "budget.create", "budget", str(budget.id),
+            self.request.user,
+            "budget.create",
+            "budget",
+            str(budget.id),
             request=self.request,
             metadata={"scope_type": budget.scope_type},
         )
@@ -227,6 +260,9 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         budget = serializer.save()
         record_audit(
-            self.request.user, "budget.update", "budget", str(budget.id),
+            self.request.user,
+            "budget.update",
+            "budget",
+            str(budget.id),
             request=self.request,
         )

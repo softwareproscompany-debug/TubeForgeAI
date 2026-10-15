@@ -18,19 +18,21 @@ Paid fallback is NEVER silent: selecting a paid provider without
 Adapters never log secret material, and outbound HTTP is restricted by an SSRF
 guard to the provider's own configured base_url host.
 """
+
 import asyncio
 import hashlib
 import json
 import uuid
 from decimal import Decimal
-from typing import Protocol
+from typing import ClassVar, Protocol
 from urllib.parse import urlparse
 
-from core.secrets import decrypt_value
 from django.conf import settings
 from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+
+from core.secrets import decrypt_value
 
 TASK_TYPES = ("image", "video", "narration", "music", "captions", "upscale")
 PAID_DEPLOYMENT_TYPES = ("cloud_gpu", "external")
@@ -89,15 +91,21 @@ class HttpProviderAdapter:
         self._secret = secret_value  # never logged, never included in errors
         host = urlparse(provider.base_url or "").hostname or ""
         if not host:
-            raise ProviderError("Provider base_url is not a valid URL.",
-                                code="INVALID_PROVIDER_URL", retryable=False)
+            raise ProviderError(
+                "Provider base_url is not a valid URL.",
+                code="INVALID_PROVIDER_URL",
+                retryable=False,
+            )
         self._allowed_host = host.lower()
 
     # -- SSRF guard ---------------------------------------------------------
     def _guard_url(self, url):
         if urlparse(url).hostname.lower() != self._allowed_host:
-            raise ProviderError("Outbound request blocked by SSRF guard.",
-                                code="SSRF_BLOCKED", retryable=False)
+            raise ProviderError(
+                "Outbound request blocked by SSRF guard.",
+                code="SSRF_BLOCKED",
+                retryable=False,
+            )
 
     def _auth_headers(self):
         return {}
@@ -112,21 +120,27 @@ class HttpProviderAdapter:
         last_error = None
         for _ in range(self.max_retries):
             try:
-                response = requests.request(method, url, headers=headers,
-                                            timeout=self.timeout, **kwargs)
+                response = requests.request(
+                    method, url, headers=headers, timeout=self.timeout, **kwargs
+                )
             except requests.RequestException as exc:
                 last_error = ProviderError(
-                    f"Provider connection failed: {type(exc).__name__}", retryable=True)
+                    f"Provider connection failed: {type(exc).__name__}", retryable=True
+                )
                 continue
             if response.status_code == 429 or response.status_code >= 500:
                 last_error = ProviderError(
                     f"Provider HTTP {response.status_code} (retryable)",
-                    code=f"HTTP_{response.status_code}", retryable=True)
+                    code=f"HTTP_{response.status_code}",
+                    retryable=True,
+                )
                 continue
             if response.status_code >= 400:
                 raise ProviderError(
                     f"Provider HTTP {response.status_code}",
-                    code=f"HTTP_{response.status_code}", retryable=False)
+                    code=f"HTTP_{response.status_code}",
+                    retryable=False,
+                )
             return response
         raise last_error or ProviderError("Provider request failed.")
 
@@ -160,7 +174,10 @@ class ComfyUIAdapter(HttpProviderAdapter):
             detail = response.json() if response.content else {}
             return {"status": "HEALTHY", "detail": detail}
         except ProviderError as exc:
-            return {"status": "UNHEALTHY", "detail": {"code": exc.code, "message": str(exc)}}
+            return {
+                "status": "UNHEALTHY",
+                "detail": {"code": exc.code, "message": str(exc)},
+            }
 
     async def estimate(self, task_type, requirements):
         price = (self.provider.capabilities or {}).get("price_per_task_usd", 0)
@@ -169,22 +186,31 @@ class ComfyUIAdapter(HttpProviderAdapter):
         return {"estimated_cost_usd": str(price), "eta_seconds": 120}
 
     async def submit(self, task_type, payload):
-        response = self._request("POST", "/prompt", json={"prompt": payload.get("workflow", {})})
+        response = self._request(
+            "POST", "/prompt", json={"prompt": payload.get("workflow", {})}
+        )
         prompt_id = (response.json() or {}).get("prompt_id")
         if not prompt_id:
-            raise ProviderError("ComfyUI did not return a prompt_id.", code="NO_PROMPT_ID")
+            raise ProviderError(
+                "ComfyUI did not return a prompt_id.", code="NO_PROMPT_ID"
+            )
         return {"external_job_id": prompt_id}
 
     async def get_status(self, external_job_id):
         response = self._request("GET", f"/history/{external_job_id}")
         data = response.json() or {}
         if external_job_id in data:
-            return {"status": "COMPLETED", "detail": {"outputs": len(data[external_job_id].get("outputs", {}))}}
+            return {
+                "status": "COMPLETED",
+                "detail": {"outputs": len(data[external_job_id].get("outputs", {}))},
+            }
         return {"status": "RUNNING"}
 
     async def fetch_outputs(self, external_job_id):
         response = self._request("GET", f"/history/{external_job_id}")
-        outputs = ((response.json() or {}).get(external_job_id) or {}).get("outputs", {})
+        outputs = ((response.json() or {}).get(external_job_id) or {}).get(
+            "outputs", {}
+        )
         results = []
         for node_outputs in outputs.values():
             for item in node_outputs.get("images", []) + node_outputs.get("gifs", []):
@@ -192,16 +218,20 @@ class ComfyUIAdapter(HttpProviderAdapter):
                     "GET",
                     f"/view?filename={item['filename']}&subfolder={item.get('subfolder', '')}&type={item.get('type', 'output')}",
                 )
-                results.append({
-                    "filename": item["filename"],
-                    "mime_type": view.headers.get("Content-Type", "application/octet-stream"),
-                    "content": view.content,
-                })
+                results.append(
+                    {
+                        "filename": item["filename"],
+                        "mime_type": view.headers.get(
+                            "Content-Type", "application/octet-stream"
+                        ),
+                        "content": view.content,
+                    }
+                )
         return results
 
 
 class OpenAICompatibleAdapter(HttpProviderAdapter):
-    _ENDPOINTS = {
+    _ENDPOINTS: ClassVar[dict[str, str]] = {
         "image": "/v1/images/generations",
         "video": "/v1/videos",
         "narration": "/v1/audio/speech",
@@ -217,7 +247,10 @@ class OpenAICompatibleAdapter(HttpProviderAdapter):
             self._request("GET", "/v1/models")
             return {"status": "HEALTHY", "detail": {}}
         except ProviderError as exc:
-            return {"status": "UNHEALTHY", "detail": {"code": exc.code, "message": str(exc)}}
+            return {
+                "status": "UNHEALTHY",
+                "detail": {"code": exc.code, "message": str(exc)},
+            }
 
     async def estimate(self, task_type, requirements):
         price = (self.provider.capabilities or {}).get("price_per_task_usd", "0.05")
@@ -262,8 +295,11 @@ def get_adapter(provider):
             secret_value = decrypt_value(raw)
     adapter_cls = ADAPTERS.get(provider.adapter_type)
     if adapter_cls is None:
-        raise ProviderError(f"Unknown adapter type: {provider.adapter_type}",
-                            code="UNKNOWN_ADAPTER", retryable=False)
+        raise ProviderError(
+            f"Unknown adapter type: {provider.adapter_type}",
+            code="UNKNOWN_ADAPTER",
+            retryable=False,
+        )
     return adapter_cls(provider, secret_value)
 
 
@@ -272,12 +308,17 @@ def get_adapter(provider):
 # ---------------------------------------------------------------------------
 def _spend_total(queryset):
     return queryset.aggregate(
-        total=Coalesce(Sum(Coalesce("actual_cost", "estimated_cost")),
-                       Value(Decimal("0")), output_field=DecimalField())
-    )["total"] or Decimal("0")
+        total=Coalesce(
+            Sum(Coalesce("actual_cost", "estimated_cost")),
+            Value(Decimal(0)),
+            output_field=DecimalField(),
+        )
+    )["total"] or Decimal(0)
 
 
-def check_budget_hierarchy(channel, project=None, workflow_id=None, estimated_cost=Decimal("0")):
+def check_budget_hierarchy(
+    channel, project=None, workflow_id=None, estimated_cost=Decimal(0)
+):
     """Raise BudgetExceeded when any applicable budget limit would be breached."""
     from .models import Budget, ResourceUsageEvent
 
@@ -313,7 +354,8 @@ def check_budget_hierarchy(channel, project=None, workflow_id=None, estimated_co
             if spent + estimated_cost > Decimal(str(daily_limit)):
                 raise BudgetExceeded(
                     f"Daily API spend limit exceeded for {scope_type} scope "
-                    f"(spent {spent}, limit {daily_limit}).")
+                    f"(spent {spent}, limit {daily_limit})."
+                )
 
         monthly_limit = limits.get("max_api_spend_monthly")
         if monthly_limit is not None:
@@ -321,14 +363,16 @@ def check_budget_hierarchy(channel, project=None, workflow_id=None, estimated_co
             if spent + estimated_cost > Decimal(str(monthly_limit)):
                 raise BudgetExceeded(
                     f"Monthly API spend limit exceeded for {scope_type} scope "
-                    f"(spent {spent}, limit {monthly_limit}).")
+                    f"(spent {spent}, limit {monthly_limit})."
+                )
 
         per_video_limit = limits.get("max_spend_per_video")
         if per_video_limit is not None and project is not None:
             spent = _spend_total(events.filter(job__project_id=project.id))
             if spent + estimated_cost > Decimal(str(per_video_limit)):
                 raise BudgetExceeded(
-                    f"Per-video spend limit exceeded (spent {spent}, limit {per_video_limit}).")
+                    f"Per-video spend limit exceeded (spent {spent}, limit {per_video_limit})."
+                )
     return True
 
 
@@ -356,11 +400,16 @@ def _parse_resolution(value):
 
 def _meets_requirements(capabilities, model, requirements):
     caps = capabilities or {}
-    required_res = _parse_resolution(requirements.get("max_resolution") or requirements.get("resolution"))
+    required_res = _parse_resolution(
+        requirements.get("max_resolution") or requirements.get("resolution")
+    )
     max_res = _parse_resolution(caps.get("max_resolution"))
-    if required_res and max_res:
-        if required_res[0] > max_res[0] or required_res[1] > max_res[1]:
-            return False
+    if (
+        required_res
+        and max_res
+        and (required_res[0] > max_res[0] or required_res[1] > max_res[1])
+    ):
+        return False
     max_duration = caps.get("max_duration_s")
     wanted = requirements.get("duration_seconds") or requirements.get("max_duration_s")
     if max_duration is not None and wanted is not None:
@@ -380,23 +429,38 @@ def _select_candidate(estimates, policy):
     if policy == "manual":
         return estimates[0]
     # local-first and hybrid-fallback: prefer local, then cheapest
-    return min(estimates, key=lambda e: (0 if e["provider"].deployment_type == "local" else 1, e["cost"]))
+    return min(
+        estimates,
+        key=lambda e: (0 if e["provider"].deployment_type == "local" else 1, e["cost"]),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Routing entry point
 # ---------------------------------------------------------------------------
-def route_generation(task_type, requirements, channel, project=None, scene=None,
-                     workflow_id=None, policy=None, idempotency_key=None,
-                     allow_paid_fallback=False, requested_model_id=None,
-                     request_metadata=None):
+def route_generation(
+    task_type,
+    requirements,
+    channel,
+    project=None,
+    scene=None,
+    workflow_id=None,
+    policy=None,
+    idempotency_key=None,
+    allow_paid_fallback=False,
+    requested_model_id=None,
+    request_metadata=None,
+):
     """Route a generation task to a provider and submit it. Returns GenerationJob."""
-    from .models import AIModel, GenerationJob, Provider
+    from .models import GenerationJob, Provider
 
     # 1. validate task
     if task_type not in TASK_TYPES:
-        raise ProviderError(f"Unsupported task type: {task_type}",
-                            code="INVALID_TASK_TYPE", retryable=False)
+        raise ProviderError(
+            f"Unsupported task type: {task_type}",
+            code="INVALID_TASK_TYPE",
+            retryable=False,
+        )
 
     # idempotency: identical request_hash + idempotency_key returns the existing job
     if idempotency_key:
@@ -404,7 +468,9 @@ def route_generation(task_type, requirements, channel, project=None, scene=None,
         if existing is not None:
             return existing
 
-    policy = policy or (channel.automation_config or {}).get("routing_policy", "local-first")
+    policy = policy or (channel.automation_config or {}).get(
+        "routing_policy", "local-first"
+    )
     requirements = dict(requirements or {})
 
     # 2-5. match capabilities, apply channel restrictions, exclude unhealthy, capacity
@@ -432,17 +498,29 @@ def route_generation(task_type, requirements, channel, project=None, scene=None,
 
     if policy == "manual":
         if not requested_model_id:
-            raise ProviderError("Manual policy requires an explicit model_id.",
-                                code="MODEL_REQUIRED", retryable=False)
-        candidates = [c for c in candidates
-                      if str(c[1].id) == str(requested_model_id)
-                      or c[1].model_identifier == requested_model_id]
+            raise ProviderError(
+                "Manual policy requires an explicit model_id.",
+                code="MODEL_REQUIRED",
+                retryable=False,
+            )
+        candidates = [
+            c
+            for c in candidates
+            if str(c[1].id) == str(requested_model_id)
+            or c[1].model_identifier == requested_model_id
+        ]
         if not candidates:
-            raise ProviderError("Requested model is not available.",
-                                code="MODEL_UNAVAILABLE", retryable=False)
+            raise ProviderError(
+                "Requested model is not available.",
+                code="MODEL_UNAVAILABLE",
+                retryable=False,
+            )
     if not candidates:
-        raise ProviderError("No capable provider is currently available.",
-                            code="NO_CAPABLE_PROVIDER", retryable=False)
+        raise ProviderError(
+            "No capable provider is currently available.",
+            code="NO_CAPABLE_PROVIDER",
+            retryable=False,
+        )
 
     # 6. estimate cost for every candidate
     estimates = []
@@ -450,50 +528,82 @@ def route_generation(task_type, requirements, channel, project=None, scene=None,
         adapter = get_adapter(provider)
         estimate = asyncio.run(adapter.estimate(task_type, requirements))
         cost = Decimal(str(estimate.get("estimated_cost_usd", "0")))
-        quality = ((model.quality_profile or {}).get("rank") or 0)
-        estimates.append({"provider": provider, "model": model, "adapter": adapter,
-                          "cost": cost, "quality": quality})
+        quality = (model.quality_profile or {}).get("rank") or 0
+        estimates.append(
+            {
+                "provider": provider,
+                "model": model,
+                "adapter": adapter,
+                "cost": cost,
+                "quality": quality,
+            }
+        )
 
     # 7. select per policy
     chosen = _select_candidate(estimates, policy)
-    provider, model, adapter, cost = (chosen["provider"], chosen["model"],
-                                     chosen["adapter"], chosen["cost"])
+    provider, model, adapter, cost = (
+        chosen["provider"],
+        chosen["model"],
+        chosen["adapter"],
+        chosen["cost"],
+    )
 
     # paid fallback is never silent
     is_paid = provider.deployment_type in PAID_DEPLOYMENT_TYPES or cost > 0
     if is_paid and not allow_paid_fallback:
         raise PaidFallbackApprovalRequired(
             f"Selected provider '{provider.name}' is a paid fallback; "
-            "re-submit with allow_paid_fallback=true or approve the paid fallback.")
+            "re-submit with allow_paid_fallback=true or approve the paid fallback."
+        )
 
     # 9. budget pre-check (server-side, before any spend)
     check_budget_hierarchy(channel, project, workflow_id, estimated_cost=cost)
 
     # 8. persist the routing decision
     request_hash = hashlib.sha256(
-        json.dumps({"task": task_type, "req": requirements,
-                    "channel": str(channel.id)}, sort_keys=True).encode()
+        json.dumps(
+            {"task": task_type, "req": requirements, "channel": str(channel.id)},
+            sort_keys=True,
+        ).encode()
     ).hexdigest()
     routing = {
         "policy": policy,
         "task_type": task_type,
         "requirements": requirements,
-        "selected": {"provider": provider.name, "provider_id": str(provider.id),
-                     "model": model.model_identifier, "estimated_cost_usd": str(cost)},
-        "candidates": [{"provider": e["provider"].name, "model": e["model"].model_identifier,
-                        "estimated_cost_usd": str(e["cost"])} for e in estimates],
+        "selected": {
+            "provider": provider.name,
+            "provider_id": str(provider.id),
+            "model": model.model_identifier,
+            "estimated_cost_usd": str(cost),
+        },
+        "candidates": [
+            {
+                "provider": e["provider"].name,
+                "model": e["model"].model_identifier,
+                "estimated_cost_usd": str(e["cost"]),
+            }
+            for e in estimates
+        ],
         "paid_fallback": is_paid,
     }
     job = GenerationJob.objects.create(
-        project=project, scene=scene, provider=provider, model=model,
-        task_type=task_type, request_hash=request_hash,
+        project=project,
+        scene=scene,
+        provider=provider,
+        model=model,
+        task_type=task_type,
+        request_hash=request_hash,
         request_metadata={**(request_metadata or {}), "routing": routing},
-        status="QUEUED", idempotency_key=idempotency_key or uuid.uuid4().hex,
+        status="QUEUED",
+        idempotency_key=idempotency_key or uuid.uuid4().hex,
         estimated_cost=cost,
     )
     try:
-        result = asyncio.run(adapter.submit(task_type, {"params": requirements,
-                                                        "workflow_id": workflow_id}))
+        result = asyncio.run(
+            adapter.submit(
+                task_type, {"params": requirements, "workflow_id": workflow_id}
+            )
+        )
         job.external_job_id = result.get("external_job_id")
         job.status = "RUNNING"
         job.started_at = timezone.now()
@@ -521,14 +631,16 @@ def complete_job(job, outputs, actual_cost=None):
     for index, output in enumerate(outputs or []):
         content = output.get("content", b"")
         asset = Asset.objects.create(
-            project=job.project, scene=job.scene,
+            project=job.project,
+            scene=job.scene,
             asset_type="VIDEO" if job.task_type == "video" else "IMAGE",
-            object_key=output.get("object_key") or
-            f"generated/{job.id}/{index}-{output.get('filename', 'output.bin')}",
+            object_key=output.get("object_key")
+            or f"generated/{job.id}/{index}-{output.get('filename', 'output.bin')}",
             mime_type=output.get("mime_type", "application/octet-stream"),
             size_bytes=len(content),
             sha256=_hashlib.sha256(content).hexdigest() if content else "",
-            source_type="GENERATED", status="READY",
+            source_type="GENERATED",
+            status="READY",
             license_metadata=(job.model.license_metadata if job.model else {}),
             model_metadata={
                 "provider": job.provider.name,
@@ -536,8 +648,12 @@ def complete_job(job, outputs, actual_cost=None):
                 "external_job_id": job.external_job_id,
             },
         )
-        GenerationOutput.objects.create(job=job, asset=asset, output_index=index,
-                                        metadata=output.get("metadata", {}))
+        GenerationOutput.objects.create(
+            job=job,
+            asset=asset,
+            output_index=index,
+            metadata=output.get("metadata", {}),
+        )
         assets.append(asset)
     if actual_cost is not None:
         job.actual_cost = Decimal(str(actual_cost))
@@ -545,9 +661,13 @@ def complete_job(job, outputs, actual_cost=None):
     job.completed_at = timezone.now()
     job.save()
     ResourceUsageEvent.objects.create(
-        provider=job.provider, job=job,
-        resource_type="api_spend_usd" if job.provider.deployment_type in PAID_DEPLOYMENT_TYPES else "local_gpu_seconds",
-        quantity=Decimal("1"), unit="job",
+        provider=job.provider,
+        job=job,
+        resource_type="api_spend_usd"
+        if job.provider.deployment_type in PAID_DEPLOYMENT_TYPES
+        else "local_gpu_seconds",
+        quantity=Decimal(1),
+        unit="job",
         estimated_cost=job.estimated_cost,
         actual_cost=job.actual_cost,
         metadata={"task_type": job.task_type},

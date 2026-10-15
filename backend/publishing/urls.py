@@ -1,4 +1,5 @@
 """Publishing URL routes."""
+
 from django.urls import path
 
 from .views import ChannelAnalyticsView, PublicationJobViewSet, VideoAnalyticsView
@@ -19,6 +20,14 @@ urlpatterns = [
     path("publications/<uuid:pk>/approve", pub_approve, name="publication-approve"),
     path("publications/<uuid:pk>/schedule", pub_schedule, name="publication-schedule"),
     path("publications/<uuid:pk>/cancel", pub_cancel, name="publication-cancel"),
-    path("channels/<uuid:pk>/analytics", ChannelAnalyticsView.as_view(), name="channel-analytics"),
-    path("videos/<str:video_id>/analytics", VideoAnalyticsView.as_view(), name="video-analytics"),
+    path(
+        "channels/<uuid:pk>/analytics",
+        ChannelAnalyticsView.as_view(),
+        name="channel-analytics",
+    ),
+    path(
+        "videos/<str:video_id>/analytics",
+        VideoAnalyticsView.as_view(),
+        name="video-analytics",
+    ),
 ]

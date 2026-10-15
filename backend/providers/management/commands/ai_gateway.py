@@ -5,6 +5,7 @@ reconciles in-flight external jobs so a lost response never double-submits.
 
 Usage: ``python manage.py ai_gateway [--once] [--poll-seconds 10]``
 """
+
 import asyncio
 import time
 
@@ -14,7 +15,6 @@ from django.utils import timezone
 
 async def _reconcile_job(job):
     from providers import gateway
-    from providers.models import GenerationJob
 
     adapter = gateway.get_adapter(job.provider)
     try:
@@ -45,8 +45,9 @@ class Command(BaseCommand):
     help = "Run the AI provider gateway reconciliation loop."
 
     def add_arguments(self, parser):
-        parser.add_argument("--once", action="store_true",
-                            help="Reconcile once, then exit.")
+        parser.add_argument(
+            "--once", action="store_true", help="Reconcile once, then exit."
+        )
         parser.add_argument("--poll-seconds", type=int, default=10)
 
     def handle(self, *args, **options):
@@ -55,13 +56,14 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("AI gateway worker started."))
         while True:
             jobs = list(
-                GenerationJob.objects.filter(status="RUNNING")
-                .select_related("provider")[:25]
+                GenerationJob.objects.filter(status="RUNNING").select_related(
+                    "provider"
+                )[:25]
             )
             for job in jobs:
                 try:
                     asyncio.run(_reconcile_job(job))
-                except Exception as exc:  # never let one job kill the loop
+                except Exception as exc:  # noqa: BLE001 - never let one job kill the loop
                     self.stderr.write(f"job {job.id}: reconcile error: {exc}")
             if options["once"]:
                 break

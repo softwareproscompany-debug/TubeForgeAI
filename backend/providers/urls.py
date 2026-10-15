@@ -1,4 +1,5 @@
 """Provider URL routes."""
+
 from django.urls import path
 
 from .views import (
@@ -31,8 +32,16 @@ budget_detail = BudgetViewSet.as_view(
 urlpatterns = [
     path("providers", provider_list, name="provider-list"),
     path("providers/<uuid:pk>", provider_detail, name="provider-detail"),
-    path("providers/<uuid:pk>/health-check", provider_health, name="provider-health-check"),
-    path("providers/<uuid:pk>/test-generation", provider_test, name="provider-test-generation"),
+    path(
+        "providers/<uuid:pk>/health-check",
+        provider_health,
+        name="provider-health-check",
+    ),
+    path(
+        "providers/<uuid:pk>/test-generation",
+        provider_test,
+        name="provider-test-generation",
+    ),
     path("models", model_list, name="aimodel-list"),
     path("models/<uuid:pk>", model_detail, name="aimodel-detail"),
     path("generations", job_list, name="generation-list"),
@@ -43,7 +52,11 @@ urlpatterns = [
     path("generation-jobs", job_list, name="generation-job-list"),
     path("generation-jobs/<uuid:pk>", job_detail, name="generation-job-detail"),
     path("generation-jobs/<uuid:pk>/cancel", job_cancel, name="generation-job-cancel"),
-    path("generation-jobs/<uuid:pk>/complete", job_complete, name="generation-job-complete"),
+    path(
+        "generation-jobs/<uuid:pk>/complete",
+        job_complete,
+        name="generation-job-complete",
+    ),
     path("resource-usage", ResourceUsageListView.as_view(), name="resource-usage"),
     path("budgets", budget_list, name="budget-list"),
     path("budgets/<uuid:pk>", budget_detail, name="budget-detail"),
