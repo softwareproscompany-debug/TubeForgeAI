@@ -11,6 +11,7 @@ Key rotation
 3. Only after every row is re-encrypted, update the ``FERNET_KEY`` env var and
    restart. Rotating the env var first will make old ciphertext undecryptable.
 """
+
 from cryptography.fernet import Fernet
 from django.conf import settings
 

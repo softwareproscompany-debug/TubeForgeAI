@@ -1,4 +1,5 @@
 """Shared utilities: pagination, error envelope, correlation IDs, permissions, audit."""
+
 import re
 import uuid
 
@@ -83,7 +84,8 @@ def tubeforge_exception_handler(exc, context):
             "error": {
                 "code": _error_code(exc, response.status_code),
                 "message": _error_message(response.data),
-                "retryable": response.status_code in (408, 409, 429, 500, 502, 503, 504),
+                "retryable": response.status_code
+                in (408, 409, 429, 500, 502, 503, 504),
                 "correlation_id": correlation_id,
             }
         }
@@ -150,7 +152,10 @@ class OwnsChannel(permissions.BasePermission):
 # ---------------------------------------------------------------------------
 # Audit
 # ---------------------------------------------------------------------------
-_SECRET_KEY_RE = re.compile(r"password|passwd|pwd|token|secret|api[_-]?key|private[_-]?key|credential", re.I)
+_SECRET_KEY_RE = re.compile(
+    r"password|passwd|pwd|token|secret|api[_-]?key|private[_-]?key|credential",
+    re.IGNORECASE,
+)
 REDACTED = "***REDACTED***"
 
 
@@ -166,7 +171,15 @@ def scrub_secrets(value):
     return value
 
 
-def record_audit(actor, action, resource_type, resource_id, outcome="success", request=None, metadata=None):
+def record_audit(
+    actor,
+    action,
+    resource_type,
+    resource_id,
+    outcome="success",
+    request=None,
+    metadata=None,
+):
     """Write an AuditEvent. ``metadata`` is scrubbed — secrets are never logged."""
     from .models import AuditEvent
 

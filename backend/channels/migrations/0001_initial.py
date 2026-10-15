@@ -8,73 +8,120 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-    ]
+    dependencies = (migrations.swappable_dependency(settings.AUTH_USER_MODEL),)
 
-    operations = [
+    operations = (
         migrations.CreateModel(
-            name='AutomationRule',
+            name="AutomationRule",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=255)),
-                ('trigger_type', models.CharField(max_length=64)),
-                ('conditions', models.JSONField(default=dict)),
-                ('actions', models.JSONField(default=dict)),
-                ('enabled', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("trigger_type", models.CharField(max_length=64)),
+                ("conditions", models.JSONField(default=dict)),
+                ("actions", models.JSONField(default=dict)),
+                ("enabled", models.BooleanField(default=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'ordering': ['name'],
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='Channel',
+            name="Channel",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('youtube_channel_id', models.CharField(blank=True, default=None, max_length=64, null=True)),
-                ('title', models.CharField(default='', max_length=255)),
-                ('description', models.TextField(blank=True, default='')),
-                ('default_language', models.CharField(default='en', max_length=16)),
-                ('timezone', models.CharField(default='UTC', max_length=64)),
-                ('brand_config', models.JSONField(default=dict)),
-                ('automation_config', models.JSONField(default=dict)),
-                ('publishing_policy', models.JSONField(default=dict)),
-                ('is_active', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('owner', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='channels', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "youtube_channel_id",
+                    models.CharField(
+                        blank=True, default=None, max_length=64, null=True
+                    ),
+                ),
+                ("title", models.CharField(default="", max_length=255)),
+                ("description", models.TextField(blank=True, default="")),
+                ("default_language", models.CharField(default="en", max_length=16)),
+                ("timezone", models.CharField(default="UTC", max_length=64)),
+                ("brand_config", models.JSONField(default=dict)),
+                ("automation_config", models.JSONField(default=dict)),
+                ("publishing_policy", models.JSONField(default=dict)),
+                ("is_active", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="channels",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
         migrations.CreateModel(
-            name='ChannelCredential',
+            name="ChannelCredential",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('provider', models.CharField(default='google', max_length=32)),
-                ('encrypted_refresh_token', models.BinaryField()),
-                ('granted_scopes', models.JSONField(default=list)),
-                ('expires_at', models.DateTimeField(blank=True, null=True)),
-                ('last_validated_at', models.DateTimeField(blank=True, null=True)),
-                ('revoked_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('channel', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='credential', to='channels.channel')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("provider", models.CharField(default="google", max_length=32)),
+                ("encrypted_refresh_token", models.BinaryField()),
+                ("granted_scopes", models.JSONField(default=list)),
+                ("expires_at", models.DateTimeField(blank=True, null=True)),
+                ("last_validated_at", models.DateTimeField(blank=True, null=True)),
+                ("revoked_at", models.DateTimeField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "channel",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="credential",
+                        to="channels.channel",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='automationrule',
-            name='channel',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='automation_rules', to='channels.channel'),
+            model_name="automationrule",
+            name="channel",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="automation_rules",
+                to="channels.channel",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='channel',
-            constraint=models.UniqueConstraint(fields=('owner', 'youtube_channel_id'), name='uniq_channel_owner_youtube'),
+            model_name="channel",
+            constraint=models.UniqueConstraint(
+                fields=("owner", "youtube_channel_id"),
+                name="uniq_channel_owner_youtube",
+            ),
         ),
-    ]
+    )

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Django management entry point for TubeForge AI."""
+
 import os
 import sys
 

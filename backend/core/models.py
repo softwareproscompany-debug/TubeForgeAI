@@ -1,4 +1,5 @@
 """Core domain models: identity, encrypted secrets, audit, notifications, settings."""
+
 import uuid
 
 from django.contrib.auth.models import AbstractUser
@@ -32,9 +33,11 @@ class EncryptedSecret(UUIDModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["owner", "name"], name="uniq_secret_owner_name"),
-        ]
+        constraints = (
+            models.UniqueConstraint(
+                fields=["owner", "name"], name="uniq_secret_owner_name"
+            ),
+        )
 
     def __str__(self):
         return f"{self.owner}:{self.name}"
@@ -44,26 +47,34 @@ class AuditEvent(UUIDModel):
     """Immutable audit trail row. Metadata is scrubbed of secrets before write."""
 
     actor = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="audit_events"
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="audit_events",
     )
     action = models.CharField(max_length=100)
     resource_type = models.CharField(max_length=100)
     resource_id = models.CharField(max_length=100)
-    outcome = models.CharField(max_length=20, default="success")  # success|failure|denied
+    outcome = models.CharField(
+        max_length=20, default="success"
+    )  # success|failure|denied
     correlation_id = models.CharField(max_length=64, blank=True, default="")
     metadata = models.JSONField(default=dict)
     occurred_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["-occurred_at"]
-        indexes = [
+        ordering = ("-occurred_at",)
+        indexes = (
             models.Index(fields=["actor", "occurred_at"]),
             models.Index(fields=["resource_type", "resource_id"]),
-        ]
+        )
 
 
 class Notification(UUIDModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications"
+    )
     type = models.CharField(max_length=100)
     title = models.CharField(max_length=255)
     body = models.TextField(blank=True, default="")
@@ -73,7 +84,7 @@ class Notification(UUIDModel):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ("-created_at",)
 
 
 class SystemSetting(UUIDModel):
@@ -81,7 +92,11 @@ class SystemSetting(UUIDModel):
     value = models.JSONField(default=dict)
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="updated_settings"
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_settings",
     )
 
     def __str__(self):

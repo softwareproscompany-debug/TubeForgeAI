@@ -1,11 +1,15 @@
 """Channel domain models: YouTube channel linkage, OAuth credentials, automation rules."""
-from core.models import UUIDModel, User
+
 from django.db import models
+
+from core.models import User, UUIDModel
 
 
 class Channel(UUIDModel):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="channels")
-    youtube_channel_id = models.CharField(max_length=64, null=True, blank=True, default=None)
+    youtube_channel_id = models.CharField(
+        max_length=64, null=True, blank=True, default=None
+    )
     title = models.CharField(max_length=255, default="")
     description = models.TextField(blank=True, default="")
     default_language = models.CharField(max_length=16, default="en")
@@ -18,12 +22,13 @@ class Channel(UUIDModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
-                fields=["owner", "youtube_channel_id"], name="uniq_channel_owner_youtube"
+                fields=["owner", "youtube_channel_id"],
+                name="uniq_channel_owner_youtube",
             ),
-        ]
-        ordering = ["-created_at"]
+        )
+        ordering = ("-created_at",)
 
     def __str__(self):
         return self.title or str(self.id)
@@ -46,7 +51,9 @@ class ChannelCredential(UUIDModel):
 
 
 class AutomationRule(UUIDModel):
-    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="automation_rules")
+    channel = models.ForeignKey(
+        Channel, on_delete=models.CASCADE, related_name="automation_rules"
+    )
     name = models.CharField(max_length=255)
     trigger_type = models.CharField(max_length=64)
     conditions = models.JSONField(default=dict)
@@ -56,4 +63,4 @@ class AutomationRule(UUIDModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ("name",)

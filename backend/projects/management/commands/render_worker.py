@@ -3,6 +3,7 @@ RenderWorker pipeline (media_engine.RenderWorker.run).
 
 Usage: ``python manage.py render_worker [--once] [--poll-seconds 5]``
 """
+
 import time
 
 from django.core.management.base import BaseCommand
@@ -13,8 +14,11 @@ class Command(BaseCommand):
     help = "Run the FFmpeg render worker loop."
 
     def add_arguments(self, parser):
-        parser.add_argument("--once", action="store_true",
-                            help="Process a single queued job, then exit.")
+        parser.add_argument(
+            "--once",
+            action="store_true",
+            help="Process a single queued job, then exit.",
+        )
         parser.add_argument("--poll-seconds", type=int, default=5)
 
     def handle(self, *args, **options):
@@ -36,25 +40,30 @@ class Command(BaseCommand):
                 time.sleep(options["poll_seconds"])
                 continue
             # Claim the job so a second worker cannot pick it up.
-            claimed = RenderJob.objects.filter(
-                id=job.id, status="QUEUED").update(status="RUNNING",
-                                                  started_at=timezone.now())
+            claimed = RenderJob.objects.filter(id=job.id, status="QUEUED").update(
+                status="RUNNING", started_at=timezone.now()
+            )
             if not claimed:
                 continue
             job.refresh_from_db()
             self.stdout.write(f"Rendering job {job.id} …")
             try:
                 plan = None
-                prev = RenderJob.objects.filter(
-                    project=job.project, status="COMPLETED"
-                ).exclude(id=job.id).order_by("-completed_at").first()
+                prev = (
+                    RenderJob.objects.filter(project=job.project, status="COMPLETED")
+                    .exclude(id=job.id)
+                    .order_by("-completed_at")
+                    .first()
+                )
                 if prev and prev.manifest:
                     from projects.media_engine import compute_incremental_plan
-                    old = (prev.manifest.get("timeline") or {})
+
+                    old = prev.manifest.get("timeline") or {}
                     plan = compute_incremental_plan(
-                        old, job.timeline_version.timeline_json)
+                        old, job.timeline_version.timeline_json
+                    )
                 worker.run(job, plan=plan)
-            except Exception as exc:  # never let one job kill the loop
+            except Exception as exc:  # noqa: BLE001 - never let one job kill the loop
                 job.status = "FAILED"
                 job.error = f"worker crashed: {exc}"[:2000]
                 job.completed_at = timezone.now()

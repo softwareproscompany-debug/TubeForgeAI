@@ -5,8 +5,9 @@ Required env vars (fail fast with ImproperlyConfigured when missing):
   FERNET_KEY   - Fernet key used to encrypt secrets at rest. Validated at startup.
   DATABASE_URL - postgres:// URL. Not required when TESTING=true (sqlite :memory:).
 """
+
 import os
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
@@ -29,11 +30,13 @@ SECRET_KEY = env("SECRET_KEY", required=True)
 FERNET_KEY = env("FERNET_KEY", required=True)
 try:
     Fernet(FERNET_KEY.encode() if isinstance(FERNET_KEY, str) else FERNET_KEY)
-except Exception as exc:  # pragma: no cover - startup guard
+except (TypeError, ValueError) as exc:  # pragma: no cover - startup guard
     raise ImproperlyConfigured(f"FERNET_KEY is not a valid Fernet key: {exc}")
 
 DEBUG = env_bool("DEBUG", "False")
-ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", "localhost").split(",") if h.strip()]
+ALLOWED_HOSTS = [
+    h.strip() for h in env("ALLOWED_HOSTS", "localhost").split(",") if h.strip()
+]
 TESTING = env_bool("TESTING", "False")
 
 
@@ -43,7 +46,9 @@ def _database_config():
     url = env("DATABASE_URL", required=True)
     parts = urlparse(url)
     if parts.scheme not in ("postgres", "postgresql"):
-        raise ImproperlyConfigured("DATABASE_URL must be a postgres:// or postgresql:// URL.")
+        raise ImproperlyConfigured(
+            "DATABASE_URL must be a postgres:// or postgresql:// URL."
+        )
     return {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": parts.path.lstrip("/") or "tubeforge",

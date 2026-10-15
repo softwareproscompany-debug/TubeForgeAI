@@ -1,4 +1,5 @@
 """Root URL configuration: every app is mounted under /api/v1/."""
+
 from django.urls import include, path
 
 urlpatterns = [

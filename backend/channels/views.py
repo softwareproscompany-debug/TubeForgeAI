@@ -1,17 +1,19 @@
 """Channel views: CRUD, YouTube OAuth connect/callback/disconnect/validate, settings, rules."""
+
 from datetime import timedelta
 
-from core.secrets import decrypt_value, encrypt_value
-from core.utils import IsOwner, UpstreamError, record_audit
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from publishing import youtube as yt
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from core.secrets import decrypt_value, encrypt_value
+from core.utils import IsOwner, UpstreamError, record_audit
+from publishing import youtube as yt
 
 from .models import AutomationRule, Channel, ChannelCredential
 from .serializers import (
@@ -31,7 +33,7 @@ def _get_owned_channel(user, pk):
 
 class ChannelViewSet(viewsets.ModelViewSet):
     serializer_class = ChannelSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwner]
+    permission_classes = (permissions.IsAuthenticated, IsOwner)
 
     def get_queryset(self):
         return Channel.objects.filter(owner=self.request.user).select_related("owner")
@@ -39,20 +41,29 @@ class ChannelViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         channel = serializer.save(owner=self.request.user)
         record_audit(
-            self.request.user, "channel.create", "channel", str(channel.id),
+            self.request.user,
+            "channel.create",
+            "channel",
+            str(channel.id),
             request=self.request,
         )
 
     def perform_update(self, serializer):
         channel = serializer.save()
         record_audit(
-            self.request.user, "channel.update", "channel", str(channel.id),
+            self.request.user,
+            "channel.update",
+            "channel",
+            str(channel.id),
             request=self.request,
         )
 
     def perform_destroy(self, instance):
         record_audit(
-            self.request.user, "channel.delete", "channel", str(instance.id),
+            self.request.user,
+            "channel.delete",
+            "channel",
+            str(instance.id),
             request=self.request,
         )
         instance.delete()
@@ -74,7 +85,11 @@ class ChannelConnectView(APIView):
         state = _signer.sign(str(channel.id))
         authorization_url = yt.build_authorization_url(state)
         record_audit(
-            request.user, "channel.oauth_start", "channel", str(channel.id), request=request,
+            request.user,
+            "channel.oauth_start",
+            "channel",
+            str(channel.id),
+            request=request,
         )
         return Response(
             {
@@ -92,18 +107,22 @@ class ChannelOAuthCallbackView(APIView):
     Never accepts or stores a Google password — only the OAuth authorization code.
     """
 
-    permission_classes = [permissions.AllowAny]
-    authentication_classes = []
+    permission_classes = (permissions.AllowAny,)
+    authentication_classes = ()
 
     def get(self, request, pk):
         code = request.query_params.get("code")
         state = request.query_params.get("state")
         if not code or not state:
-            raise ValidationError({"detail": "Missing 'code' or 'state' query parameter."})
+            raise ValidationError(
+                {"detail": "Missing 'code' or 'state' query parameter."}
+            )
         try:
             channel_id = _signer.unsign(state, max_age=STATE_MAX_AGE_SECONDS)
         except SignatureExpired:
-            raise ValidationError({"state": "OAuth state expired. Restart the connect flow."})
+            raise ValidationError(
+                {"state": "OAuth state expired. Restart the connect flow."}
+            )
         except BadSignature:
             raise ValidationError({"state": "OAuth state signature invalid."})
         if str(pk) != str(channel_id):
@@ -118,7 +137,9 @@ class ChannelOAuthCallbackView(APIView):
         refresh_token = tokens.get("refresh_token")
         if not refresh_token:
             raise ValidationError(
-                {"detail": "Google did not return a refresh token. Reconnect with consent."}
+                {
+                    "detail": "Google did not return a refresh token. Reconnect with consent."
+                }
             )
         expires_in = int(tokens.get("expires_in") or 3600)
         try:
@@ -147,7 +168,10 @@ class ChannelOAuthCallbackView(APIView):
                 {"detail": "This YouTube channel is already connected to your account."}
             ) from exc
         record_audit(
-            channel.owner, "channel.oauth_complete", "channel", str(channel.id),
+            channel.owner,
+            "channel.oauth_complete",
+            "channel",
+            str(channel.id),
             metadata={"youtube_channel_id": channel.youtube_channel_id},
         )
         return Response(ChannelSerializer(channel).data)
@@ -168,11 +192,17 @@ class ChannelDisconnectView(APIView):
                 pass  # revocation best-effort; local state is still cleared
             credential.encrypted_refresh_token = b""
             credential.revoked_at = timezone.now()
-            credential.save(update_fields=["encrypted_refresh_token", "revoked_at", "updated_at"])
+            credential.save(
+                update_fields=["encrypted_refresh_token", "revoked_at", "updated_at"]
+            )
         channel.is_active = False
         channel.save(update_fields=["is_active", "updated_at"])
         record_audit(
-            request.user, "channel.disconnect", "channel", str(channel.id), request=request,
+            request.user,
+            "channel.disconnect",
+            "channel",
+            str(channel.id),
+            request=request,
         )
         return Response({"detail": "Channel disconnected."})
 
@@ -190,7 +220,9 @@ class ChannelValidateView(APIView):
             tokens = yt.refresh_access_token(decrypt_value(raw))
         except yt.YouTubeError as exc:
             return Response({"valid": False, "reason": str(exc)[:200]})
-        credential.expires_at = timezone.now() + timedelta(seconds=int(tokens.get("expires_in") or 3600))
+        credential.expires_at = timezone.now() + timedelta(
+            seconds=int(tokens.get("expires_in") or 3600)
+        )
         credential.last_validated_at = timezone.now()
         credential.save(update_fields=["expires_at", "last_validated_at", "updated_at"])
         return Response(
@@ -222,39 +254,54 @@ class ChannelSettingsView(APIView):
             setattr(channel, field, value)
         channel.save()
         record_audit(
-            request.user, "channel.settings_update", "channel", str(channel.id),
-            request=request, metadata={"fields": list(serializer.validated_data)},
+            request.user,
+            "channel.settings_update",
+            "channel",
+            str(channel.id),
+            request=request,
+            metadata={"fields": list(serializer.validated_data)},
         )
         return Response(ChannelSerializer(channel).data)
 
 
 class AutomationRuleViewSet(viewsets.ModelViewSet):
     serializer_class = AutomationRuleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = (permissions.IsAuthenticated,)
 
     def _channel(self):
         return _get_owned_channel(self.request.user, self.kwargs["channel_pk"])
 
     def get_queryset(self):
-        return AutomationRule.objects.filter(channel=self._channel()).select_related("channel")
+        return AutomationRule.objects.filter(channel=self._channel()).select_related(
+            "channel"
+        )
 
     def perform_create(self, serializer):
         rule = serializer.save(channel=self._channel())
         record_audit(
-            self.request.user, "automation_rule.create", "automation_rule", str(rule.id),
+            self.request.user,
+            "automation_rule.create",
+            "automation_rule",
+            str(rule.id),
             request=self.request,
         )
 
     def perform_update(self, serializer):
         rule = serializer.save()
         record_audit(
-            self.request.user, "automation_rule.update", "automation_rule", str(rule.id),
+            self.request.user,
+            "automation_rule.update",
+            "automation_rule",
+            str(rule.id),
             request=self.request,
         )
 
     def perform_destroy(self, instance):
         record_audit(
-            self.request.user, "automation_rule.delete", "automation_rule", str(instance.id),
+            self.request.user,
+            "automation_rule.delete",
+            "automation_rule",
+            str(instance.id),
             request=self.request,
         )
         instance.delete()
