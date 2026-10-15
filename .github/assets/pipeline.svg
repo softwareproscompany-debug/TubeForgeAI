@@ -19,6 +19,16 @@
   </defs>
   <rect width="1280" height="300" rx="16" fill="url(#pbg)" stroke="#1e293b" stroke-width="1"/>
   <text x="40" y="44" font-size="20" font-weight="700" fill="#e2e8f0" font-family="sans-serif" letter-spacing="3">PRODUCTION PIPELINE &#8212; 22 DURABLE STATES</text>
+  <!-- live version badge -->
+  <g font-family="sans-serif">
+    <rect x="1130" y="22" width="110" height="28" rx="14" fill="none" stroke="#4ade80" stroke-width="1.5">
+      <animate attributeName="stroke-opacity" values="1;0.4;1" dur="2.5s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="1152" cy="36" r="5" fill="#4ade80">
+      <animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <text x="1164" y="42" font-size="15" font-weight="700" fill="#4ade80">v1.0.0 LIVE</text>
+  </g>
 
   <!-- stat blocks with animated bars -->
   <g font-family="sans-serif">
@@ -60,21 +70,31 @@
     <rect x="1030" y="136" width="210" height="10" rx="5" fill="url(#barD)">
       <animate attributeName="width" values="0;210" dur="1.6s" begin="0.6s" fill="freeze"/>
     </rect>
-    <text x="1030" y="168" font-size="13" fill="#475569">Next.js &#183; React &#183; TypeScript &#183; Tailwind</text>
+    <text x="1030" y="168" font-size="13" fill="#475569">Next.js 16 &#183; React 19 &#183; TypeScript &#183; Tailwind v4</text>
   </g>
 
-  <!-- bottom strip: guarantees -->
+  <!-- bottom strip: guarantees with pulsing dots -->
   <g font-family="sans-serif" font-size="14" fill="#94a3b8">
-    <circle cx="52" cy="228" r="5" fill="#22d3ee"/>
+    <circle cx="52" cy="228" r="5" fill="#22d3ee">
+      <animate attributeName="r" values="5;7;5" dur="2s" repeatCount="indefinite"/>
+    </circle>
     <text x="66" y="233">Local-first routing</text>
-    <circle cx="262" cy="228" r="5" fill="#a78bfa"/>
+    <circle cx="262" cy="228" r="5" fill="#a78bfa">
+      <animate attributeName="r" values="5;7;5" dur="2s" begin="0.4s" repeatCount="indefinite"/>
+    </circle>
     <text x="276" y="233">No per-generation credits</text>
-    <circle cx="502" cy="228" r="5" fill="#fb7185"/>
+    <circle cx="502" cy="228" r="5" fill="#fb7185">
+      <animate attributeName="r" values="5;7;5" dur="2s" begin="0.8s" repeatCount="indefinite"/>
+    </circle>
     <text x="516" y="233">Idempotent publishing</text>
-    <circle cx="722" cy="228" r="5" fill="#4ade80"/>
+    <circle cx="722" cy="228" r="5" fill="#4ade80">
+      <animate attributeName="r" values="5;7;5" dur="2s" begin="1.2s" repeatCount="indefinite"/>
+    </circle>
     <text x="736" y="233">Server-side budgets</text>
-    <circle cx="942" cy="228" r="5" fill="#fbbf24"/>
+    <circle cx="942" cy="228" r="5" fill="#fbbf24">
+      <animate attributeName="r" values="5;7;5" dur="2s" begin="1.6s" repeatCount="indefinite"/>
+    </circle>
     <text x="956" y="233">Traceable assets</text>
   </g>
-  <text x="40" y="272" font-size="13" fill="#334155" font-family="sans-serif">Django 5 &#183; DRF &#183; PostgreSQL 16 &#183; Redis 7 &#183; Temporal &#183; FFmpeg &#183; YouTube Data API v3</text>
+  <text x="40" y="272" font-size="13" fill="#334155" font-family="sans-serif">Django 5.2 &#183; DRF &#183; PostgreSQL 16 &#183; Redis 7 &#183; Temporal &#183; FFmpeg &#183; YouTube Data API v3</text>
 </svg>

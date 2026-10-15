@@ -30,22 +30,69 @@
     <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
       <feGaussianBlur stdDeviation="6"/>
     </filter>
+    <linearGradient id="badgeGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
   </defs>
 
   <rect width="1280" height="400" fill="url(#bg)"/>
   <rect width="1280" height="400" fill="url(#grid)"/>
-  <ellipse cx="220" cy="120" rx="320" ry="180" fill="url(#glow)"/>
-  <ellipse cx="1060" cy="290" rx="340" ry="190" fill="url(#glowP)"/>
+  <ellipse cx="220" cy="120" rx="320" ry="180" fill="url(#glow)">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="6s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="1060" cy="290" rx="340" ry="190" fill="url(#glowP)">
+    <animate attributeName="opacity" values="1;0.7;1" dur="7s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- floating particles -->
+  <g fill="#22d3ee" opacity="0.5">
+    <circle cx="150" cy="320" r="3">
+      <animate attributeName="cy" values="320;280;320" dur="5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.5;0.1;0.5" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="400" cy="80" r="2.5" fill="#a78bfa">
+      <animate attributeName="cy" values="80;120;80" dur="6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.5;0.1;0.5" dur="6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="700" cy="340" r="3.5" fill="#fb7185">
+      <animate attributeName="cy" values="340;300;340" dur="4.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.5;0.1;0.5" dur="4.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1150" cy="90" r="2.5" fill="#4ade80">
+      <animate attributeName="cy" values="90;130;90" dur="5.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.5;0.1;0.5" dur="5.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
 
   <!-- left: wordmark -->
   <g font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
-    <text x="72" y="158" font-size="30" font-weight="600" fill="#7dd3fc" letter-spacing="6">
+    <text x="72" y="118" font-size="30" font-weight="600" fill="#7dd3fc" letter-spacing="6">
       TUBEFORGE
       <animate attributeName="opacity" values="1;0.75;1" dur="4s" repeatCount="indefinite"/>
     </text>
-    <text x="68" y="238" font-size="88" font-weight="800" fill="url(#titleGrad)" letter-spacing="2">TubeForge AI</text>
-    <text x="72" y="286" font-size="24" fill="#c4b5fd" opacity="0.95">The AI-Powered YouTube Operating System</text>
-    <text x="72" y="322" font-size="16" fill="#64748b">research &#8594; script &#8594; scenes &#8594; narration &#8594; visuals &#8594; assembly &#8594; publish &#8594; analytics</text>
+    <!-- version badge -->
+    <g>
+      <rect x="330" y="88" width="86" height="30" rx="15" fill="url(#badgeGrad)" opacity="0.9">
+        <animate attributeName="opacity" values="0.9;0.6;0.9" dur="3s" repeatCount="indefinite"/>
+      </rect>
+      <text x="373" y="109" text-anchor="middle" font-size="16" font-weight="700" fill="#050816" font-family="sans-serif">v1.0.0</text>
+    </g>
+    <text x="68" y="208" font-size="88" font-weight="800" fill="url(#titleGrad)" letter-spacing="2">TubeForge AI</text>
+    <text x="72" y="256" font-size="24" fill="#c4b5fd" opacity="0.95">The AI-Powered YouTube Operating System</text>
+    <text x="72" y="292" font-size="16" fill="#64748b">research &#8594; script &#8594; scenes &#8594; narration &#8594; visuals &#8594; assembly &#8594; publish &#8594; analytics</text>
+    <!-- tech stack -->
+    <g font-size="14" font-family="monospace">
+      <text x="72" y="330" fill="#22d3ee">Next.js 16</text>
+      <text x="180" y="330" fill="#64748b">&#8226;</text>
+      <text x="200" y="330" fill="#a78bfa">React 19</text>
+      <text x="290" y="330" fill="#64748b">&#8226;</text>
+      <text x="310" y="330" fill="#fb7185">Django 5</text>
+      <text x="400" y="330" fill="#64748b">&#8226;</text>
+      <text x="420" y="330" fill="#4ade80">Temporal</text>
+      <text x="510" y="330" fill="#64748b">&#8226;</text>
+      <text x="530" y="330" fill="#fbbf24">FFmpeg</text>
+    </g>
   </g>
 
   <!-- right: animated pipeline nodes -->
