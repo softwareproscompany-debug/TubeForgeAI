@@ -181,13 +181,21 @@ class YouTubeClient:
         return session_uri
 
     def _query_upload_offset(self, session_uri, file_size_bytes):
-        response = requests.put(
-            session_uri,
-            headers=self._headers(
-                {"Content-Length": "0", "Content-Range": f"bytes */{file_size_bytes}"}
-            ),
-            timeout=30,
-        )
+        try:
+            response = requests.put(
+                session_uri,
+                headers=self._headers(
+                    {
+                        "Content-Length": "0",
+                        "Content-Range": f"bytes */{file_size_bytes}",
+                    }
+                ),
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise RetryableUploadError(
+                f"Upload reconcile unreachable: {type(exc).__name__}"
+            ) from exc
         if response.status_code == 308:
             uploaded_range = response.headers.get("Range", "")
             if uploaded_range.startswith("bytes=0-"):
@@ -232,13 +240,21 @@ class YouTubeClient:
                     continue
                 raise YouTubeError(f"Upload chunk HTTP {response.status_code}.")
         # Final reconcile in case the last chunk response was lost.
-        status_response = requests.put(
-            session_uri,
-            headers=self._headers(
-                {"Content-Length": "0", "Content-Range": f"bytes */{file_size_bytes}"}
-            ),
-            timeout=30,
-        )
+        try:
+            status_response = requests.put(
+                session_uri,
+                headers=self._headers(
+                    {
+                        "Content-Length": "0",
+                        "Content-Range": f"bytes */{file_size_bytes}",
+                    }
+                ),
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise RetryableUploadError(
+                f"Final upload reconcile unreachable: {type(exc).__name__}"
+            ) from exc
         if status_response.status_code in (200, 201):
             return status_response.json()
         raise RetryableUploadError(

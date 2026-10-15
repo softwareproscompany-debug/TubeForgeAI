@@ -1,0 +1,3 @@
+# TubeForge AI — frontend .dockerignore (builds with context frontend/).
+node_modules
+.next

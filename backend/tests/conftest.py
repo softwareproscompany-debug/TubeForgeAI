@@ -2,18 +2,29 @@
 
 import os
 
-os.environ.setdefault("TESTING", "true")
-os.environ.setdefault(
-    "SECRET_KEY", "test-secret-key-0123456789abcdef-not-for-production"
-)
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+
+def _ensure_test_env(name, default):
+    """Fill a test-safe default when the env var is missing *or empty*.
+
+    settings' ``env()`` treats "" as missing and raises, while
+    ``setdefault()`` would keep a stale empty value (the exact shape of the
+    CI "Required environment variable ... is not set" failure). Explicitly
+    set non-empty values are always respected.
+    """
+    if not os.environ.get(name):
+        os.environ[name] = default
+
+
+_ensure_test_env("TESTING", "true")
+_ensure_test_env("SECRET_KEY", "test-secret-key-0123456789abcdef-not-for-production")
+_ensure_test_env("DJANGO_SETTINGS_MODULE", "config.settings")
 
 try:
     from cryptography.fernet import Fernet
 
-    os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
+    _ensure_test_env("FERNET_KEY", Fernet.generate_key().decode())
 except Exception:  # noqa: BLE001 - test setup fallback; pragma: no cover
-    os.environ.setdefault("FERNET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+    _ensure_test_env("FERNET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 
 import django
 

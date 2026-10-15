@@ -5,6 +5,7 @@ import asyncio
 import json
 
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models import Q
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
@@ -15,7 +16,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.utils import InvalidTransitionAPI, record_audit
+from core.utils import InvalidTransitionAPI, parse_uuid, record_audit
 from projects.models import Project
 
 from . import engine
@@ -90,9 +91,14 @@ def _run_synchronous_stages(run, actor, request):
         run.refresh_from_db()
         if run.status in engine.TERMINAL_STATES:
             break
-        engine.transition(
-            run, stage, actor=actor, request=request, event_type="sync_stage"
-        )
+        try:
+            engine.transition(
+                run, stage, actor=actor, request=request, event_type="sync_stage"
+            )
+        except engine.InvalidTransition:
+            # A concurrent pause/cancel raced the fallback runner; stop here
+            # rather than 500ing the workflow creation.
+            break
         completed.append(stage)
     run.refresh_from_db()
     summary = dict(run.output_summary or {})
@@ -121,15 +127,26 @@ class ProjectWorkflowCreateView(APIView):
         )
         serializer = WorkflowRunCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        version = project.workflow_runs.count() + 1
-        run = WorkflowRun.objects.create(
-            project=project,
-            workflow_type=serializer.validated_data["workflow_type"],
-            temporal_workflow_id=build_workflow_id(project.id, version),
-            status="DRAFT",
-            current_stage="DRAFT",
-            input_snapshot=serializer.validated_data.get("input", {}),
-        )
+        # Bounded retry: concurrent creates can compute the same version and
+        # collide on the unique temporal_workflow_id; re-count and retry.
+        for _ in range(3):
+            version = project.workflow_runs.count() + 1
+            try:
+                run = WorkflowRun.objects.create(
+                    project=project,
+                    workflow_type=serializer.validated_data["workflow_type"],
+                    temporal_workflow_id=build_workflow_id(project.id, version),
+                    status="DRAFT",
+                    current_stage="DRAFT",
+                    input_snapshot=serializer.validated_data.get("input", {}),
+                )
+                break
+            except IntegrityError:
+                continue
+        else:
+            raise ValidationError(
+                {"detail": "Could not allocate a workflow run; please retry."}
+            )
         try:
             engine.transition(run, "PLANNING", actor=request.user, request=request)
         except engine.InvalidTransition as exc:
@@ -177,7 +194,7 @@ class WorkflowRunViewSet(viewsets.ReadOnlyModelViewSet):
         ).select_related("project__channel")
         project_id = self.request.query_params.get("project_id")
         if project_id:
-            qs = qs.filter(project_id=project_id)
+            qs = qs.filter(project_id=parse_uuid(project_id, "project_id"))
         return qs
 
     def _transition_action(self, request, pk, to_state, action_name):
@@ -256,7 +273,7 @@ class ApprovalViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         project = get_object_or_404(
             Project,
-            pk=self.request.data.get("project"),
+            pk=parse_uuid(self.request.data.get("project"), "project"),
             channel__owner=self.request.user,
         )
         approval = serializer.save(project=project, requested_by=self.request.user)
@@ -280,15 +297,22 @@ class ApprovalViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": "This approval has already been decided."})
         serializer = ApprovalDecideSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        approval.status = (
+        new_status = (
             "APPROVED"
             if serializer.validated_data["decision"] == "approved"
             else "REJECTED"
         )
-        approval.decided_by = request.user
-        approval.decision_reason = serializer.validated_data.get("reason", "")
-        approval.decided_at = timezone.now()
-        approval.save()
+        # Atomic decide: the conditional UPDATE is the single linearization
+        # point, so two concurrent decides cannot both succeed.
+        decided = Approval.objects.filter(pk=approval.pk, status="PENDING").update(
+            status=new_status,
+            decided_by=request.user,
+            decision_reason=serializer.validated_data.get("reason", ""),
+            decided_at=timezone.now(),
+        )
+        if not decided:
+            raise ValidationError({"detail": "This approval has already been decided."})
+        approval.refresh_from_db()
         record_audit(
             request.user,
             "approval.decide",

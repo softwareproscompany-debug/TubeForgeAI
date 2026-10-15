@@ -1,8 +1,12 @@
 """Security tests: owner scoping, secret redaction, OAuth state integrity,
 audit scrubbing."""
 
+import time
+from unittest import mock
+
 import pytest
 
+from channels.views import STATE_MAX_AGE_SECONDS, _signer
 from core.models import AuditEvent
 from core.secrets import encrypt_value
 from core.utils import record_audit
@@ -70,16 +74,22 @@ def test_oauth_state_tampering_rejected(auth_client):
 
 @pytest.mark.django_db
 def test_oauth_state_expiry_rejected(auth_client):
-    from channels.views import _signer
-
     connect = auth_client.post("/api/v1/channels/connect", {"title": "OAuth expiry"})
+    assert connect.status_code == 201
     channel_id = connect.json()["channel_id"]
-    forged = _signer.sign("00000000-0000-0000-0000-000000000000")
+    # Sign a state token in the past so it is genuinely older than the max
+    # age; the callback must reject it as expired (not merely mismatched).
+    past = time.time() - (STATE_MAX_AGE_SECONDS + 60)
+    with mock.patch("django.core.signing.time") as mock_time:
+        mock_time.time.return_value = past
+        mock_time.return_value = past  # covers `from time import time` style too
+        expired_state = _signer.sign(channel_id)
     callback = auth_client.get(
         f"/api/v1/channels/{channel_id}/oauth/callback",
-        {"code": "fake-code", "state": forged},
+        {"code": "fake-code", "state": expired_state},
     )
     assert callback.status_code == 400
+    assert callback.json()["error"]["code"] == "validation_error"
 
 
 @pytest.mark.django_db

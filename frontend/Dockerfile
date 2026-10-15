@@ -1,7 +1,9 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install --no-audit --no-fund
+# Pinned install via the committed lockfile (npm ci fails loudly if the
+# lock drifts out of sync with package.json — that is the point).
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 FROM node:20-alpine AS builder
 WORKDIR /app

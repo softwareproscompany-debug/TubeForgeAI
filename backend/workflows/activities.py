@@ -127,6 +127,10 @@ async def generate_assets_stage(run_id: str, project_id: str) -> dict:
                 project=project,
                 scene=scene,
                 workflow_id=str(run.id),
+                # Deterministic key: a Temporal retry of this activity must
+                # reuse the already-submitted job, never submit (and pay for) a
+                # duplicate.
+                idempotency_key=f"wf-{run.id}-scene-{scene.id}",
                 request_metadata={
                     "scene_id": str(scene.id),
                     "stage": "generate_assets",
@@ -168,6 +172,7 @@ async def narration_stage(run_id: str, project_id: str) -> dict:
             channel=project.channel,
             project=project,
             workflow_id=str(run.id),
+            idempotency_key=f"wf-{run.id}-narration",
             request_metadata={"stage": "narration"},
         )
         WorkflowEvent.objects.create(
@@ -213,16 +218,30 @@ async def render_stage(run_id: str, project_id: str) -> dict:
         timeline = project.timeline_versions.first()
         if timeline is None:
             raise RuntimeError("No timeline version to render.")
-        job = RenderJob.objects.create(
-            project=project,
-            timeline_version=timeline,
-            status="QUEUED",
-            manifest=media_engine.build_render_manifest(
-                {}, timeline.id, {}, {"timeline_valid": True}
-            ),
+        # Checkpoint resume: a retry must not render twice. Reuse a completed
+        # render for this timeline, or resume an in-progress one.
+        job = (
+            RenderJob.objects.filter(timeline_version=timeline, status="COMPLETED")
+            .order_by("-created_at")
+            .first()
+            or RenderJob.objects.filter(
+                timeline_version=timeline, status__in=("QUEUED", "RUNNING")
+            )
+            .order_by("-created_at")
+            .first()
         )
-        media_engine.RenderWorker().run(job)
-        job.refresh_from_db()
+        if job is None:
+            job = RenderJob.objects.create(
+                project=project,
+                timeline_version=timeline,
+                status="QUEUED",
+                manifest=media_engine.build_render_manifest(
+                    {}, timeline.id, {}, {"timeline_valid": True}
+                ),
+            )
+        if job.status != "COMPLETED":
+            media_engine.RenderWorker().run(job)
+            job.refresh_from_db()
         WorkflowEvent.objects.create(
             run=run,
             event_type="stage_completed",
@@ -269,7 +288,15 @@ async def publish_stage(run_id: str, project_id: str, publication_id: str = "") 
         blocking = [i for i in issues if i["severity"] == "blocking"]
         if blocking:
             raise RuntimeError(f"Publication blocked: {blocking[0]['code']}")
-        yt.UploadStateMachine.transition(publication, "UPLOAD_PENDING")
+        # Idempotent on retry: only start the upload from APPROVED; a previous
+        # attempt may already have moved it to UPLOAD_PENDING.
+        if publication.status == "APPROVED":
+            yt.UploadStateMachine.transition(publication, "UPLOAD_PENDING")
+        elif publication.status != "UPLOAD_PENDING":
+            raise RuntimeError(
+                f"Publication {publication.id} is {publication.status}; "
+                "cannot start upload."
+            )
         WorkflowEvent.objects.create(
             run=run,
             event_type="stage_completed",

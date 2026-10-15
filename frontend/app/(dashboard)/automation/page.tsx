@@ -13,7 +13,7 @@ export default function AutomationPage() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", trigger: "", conditions: "{}", actions: "{}", enabled: true });
+  const [form, setForm] = useState({ name: "", trigger_type: "", conditions: "{}", actions: "{}", enabled: true });
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function AutomationPage() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", trigger: "", conditions: "{}", actions: "{}", enabled: true });
+    setForm({ name: "", trigger_type: "", conditions: "{}", actions: "{}", enabled: true });
     setFormError(null);
     setShowForm(true);
   };
@@ -47,7 +47,7 @@ export default function AutomationPage() {
     setEditing(r);
     setForm({
       name: r.name,
-      trigger: r.trigger,
+      trigger_type: r.trigger_type,
       conditions: JSON.stringify(r.conditions || {}, null, 2),
       actions: JSON.stringify(r.actions || {}, null, 2),
       enabled: r.enabled,
@@ -69,11 +69,11 @@ export default function AutomationPage() {
     try {
       if (editing) {
         await api.patch(`/channels/${channelId}/automation-rules/${editing.id}`, {
-          name: form.name, trigger: form.trigger, conditions, actions, enabled: form.enabled,
+          name: form.name, trigger_type: form.trigger_type, conditions, actions, enabled: form.enabled,
         });
       } else {
         await api.post(`/channels/${channelId}/automation-rules`, {
-          channel_id: channelId, name: form.name, trigger: form.trigger, conditions, actions, enabled: form.enabled,
+          name: form.name, trigger_type: form.trigger_type, conditions, actions, enabled: form.enabled,
         });
       }
       setShowForm(false);
@@ -127,7 +127,7 @@ export default function AutomationPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-studio-text font-medium">{r.name}</div>
-                <div className="text-xs text-studio-faint mt-0.5">trigger: <span className="font-mono">{r.trigger}</span></div>
+                <div className="text-xs text-studio-faint mt-0.5">trigger: <span className="font-mono">{r.trigger_type}</span></div>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={r.enabled ? "HEALTHY" : "PAUSED"} />
@@ -163,7 +163,7 @@ export default function AutomationPage() {
               </label>
               <label className="block">
                 <span className="text-studio-muted text-xs">Trigger</span>
-                <input value={form.trigger} onChange={(e) => setForm({ ...form, trigger: e.target.value })}
+                <input value={form.trigger_type} onChange={(e) => setForm({ ...form, trigger_type: e.target.value })}
                   placeholder="e.g. video_published, schedule_tick" className={cls} />
               </label>
               <label className="block">
@@ -184,7 +184,7 @@ export default function AutomationPage() {
             {formError && <div className="text-sm text-red-400 mt-3">{formError}</div>}
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 rounded-md border border-studio-border text-studio-text">Cancel</button>
-              <button onClick={save} disabled={!form.name.trim() || !form.trigger.trim()}
+              <button onClick={save} disabled={!form.name.trim() || !form.trigger_type.trim()}
                 className="text-sm bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
                 Save rule
               </button>
