@@ -26,6 +26,13 @@ export interface User {
   date_joined: string;
 }
 
+// ── Auth / passkeys ──────────────────────────────────────────
+export interface PasskeyInfo {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 // ── Channels ──────────────────────────────────────────────
 export interface Channel {
   id: string;
@@ -385,4 +392,35 @@ export interface AutomationRule {
   conditions: Record<string, unknown>;
   actions: Record<string, unknown>;
   enabled: boolean;
+}
+
+export interface SubscriptionTier {
+  id: string;
+  name: string;
+  display_name: string;
+  price_monthly_cents: number;
+  price_monthly_usd: number;
+  max_projects: number;
+  max_storage_gb: number;
+  max_api_calls_month: number;
+  features: string[];
+}
+
+export interface BillingUsage {
+  projects_used: number;
+  projects_limit: number;
+  storage_gb_used: number;
+  storage_gb_limit: number;
+  api_calls_used: number;
+  api_calls_limit: number;
+}
+
+export interface UserSubscription {
+  id: string;
+  tier: SubscriptionTier;
+  status: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  created_at: string;
+  updated_at: string;
 }
