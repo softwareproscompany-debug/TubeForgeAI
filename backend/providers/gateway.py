@@ -28,6 +28,7 @@ from typing import ClassVar, Protocol
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -100,7 +101,8 @@ class HttpProviderAdapter:
 
     # -- SSRF guard ---------------------------------------------------------
     def _guard_url(self, url):
-        if urlparse(url).hostname.lower() != self._allowed_host:
+        host = (urlparse(url).hostname or "").lower()
+        if host != self._allowed_host:
             raise ProviderError(
                 "Outbound request blocked by SSRF guard.",
                 code="SSRF_BLOCKED",
@@ -216,7 +218,12 @@ class ComfyUIAdapter(HttpProviderAdapter):
             for item in node_outputs.get("images", []) + node_outputs.get("gifs", []):
                 view = self._request(
                     "GET",
-                    f"/view?filename={item['filename']}&subfolder={item.get('subfolder', '')}&type={item.get('type', 'output')}",
+                    "/view",
+                    params={
+                        "filename": item["filename"],
+                        "subfolder": item.get("subfolder", ""),
+                        "type": item.get("type", "output"),
+                    },
                 )
                 results.append(
                     {
@@ -462,9 +469,14 @@ def route_generation(
             retryable=False,
         )
 
-    # idempotency: identical request_hash + idempotency_key returns the existing job
+    # idempotency: identical request_hash + idempotency_key returns the existing job.
+    # The lookup is scoped to the project when one is given so one user's key
+    # can never resolve to (or leak) another user's job.
     if idempotency_key:
-        existing = GenerationJob.objects.filter(idempotency_key=idempotency_key).first()
+        lookup = GenerationJob.objects.filter(idempotency_key=idempotency_key)
+        if project is not None:
+            lookup = lookup.filter(project=project)
+        existing = lookup.first()
         if existing is not None:
             return existing
 
@@ -586,18 +598,27 @@ def route_generation(
         ],
         "paid_fallback": is_paid,
     }
-    job = GenerationJob.objects.create(
-        project=project,
-        scene=scene,
-        provider=provider,
-        model=model,
-        task_type=task_type,
-        request_hash=request_hash,
-        request_metadata={**(request_metadata or {}), "routing": routing},
-        status="QUEUED",
-        idempotency_key=idempotency_key or uuid.uuid4().hex,
-        estimated_cost=cost,
-    )
+    try:
+        job = GenerationJob.objects.create(
+            project=project,
+            scene=scene,
+            provider=provider,
+            model=model,
+            task_type=task_type,
+            request_hash=request_hash,
+            request_metadata={**(request_metadata or {}), "routing": routing},
+            status="QUEUED",
+            idempotency_key=idempotency_key or uuid.uuid4().hex,
+            estimated_cost=cost,
+        )
+    except IntegrityError as exc:
+        # Lost a race (or collided across users) on the globally-unique
+        # idempotency key: surface a 400-class error, never a 500 or a leak.
+        raise ProviderError(
+            "Idempotency key already in use.",
+            code="IDEMPOTENCY_KEY_IN_USE",
+            retryable=False,
+        ) from exc
     try:
         result = asyncio.run(
             adapter.submit(

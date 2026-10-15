@@ -4,6 +4,7 @@ scheduling, and source-labeled analytics."""
 import zoneinfo
 from datetime import datetime
 
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
@@ -73,18 +74,26 @@ class PublicationJobViewSet(viewsets.ModelViewSet):
             asset = get_object_or_404(
                 Asset, pk=asset.id, project__channel__owner=request.user
             )
-        publication = PublicationJob.objects.create(
-            project=project,
-            channel=project.channel,
-            asset=asset,
-            title=serializer.validated_data["title"],
-            description=serializer.validated_data.get("description", ""),
-            tags=serializer.validated_data.get("tags", []),
-            visibility=serializer.validated_data.get("visibility", "private"),
-            scheduled_at=serializer.validated_data.get("scheduled_at"),
-            status="DRAFT",
-            idempotency_key=key,
-        )
+        try:
+            publication = PublicationJob.objects.create(
+                project=project,
+                channel=project.channel,
+                asset=asset,
+                title=serializer.validated_data["title"],
+                description=serializer.validated_data.get("description", ""),
+                tags=serializer.validated_data.get("tags", []),
+                visibility=serializer.validated_data.get("visibility", "private"),
+                scheduled_at=serializer.validated_data.get("scheduled_at"),
+                status="DRAFT",
+                idempotency_key=key,
+            )
+        except IntegrityError:
+            # Lost the race with a concurrent create using the same key: the
+            # pre-check above already verified any existing row belongs to us.
+            existing = PublicationJob.objects.filter(idempotency_key=key).first()
+            if existing is not None and existing.channel.owner == request.user:
+                return Response(PublicationJobSerializer(existing).data)
+            raise
         record_audit(
             request.user,
             "publication.create",

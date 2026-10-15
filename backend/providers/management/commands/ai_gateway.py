@@ -34,7 +34,8 @@ async def _reconcile_job(job):
         gateway.complete_job(job, assets)
     elif status in ("FAILED", "ERROR", "CANCELED"):
         job.status = "FAILED"
-        job.error_code = state.get("error_code", "PROVIDER_FAILED")
+        # state.get("error_code") may be absent (None); the column is NOT NULL.
+        job.error_code = state.get("error_code") or "PROVIDER_FAILED"
         job.error_message = str(state.get("error", "provider reported failure"))[:2000]
         job.completed_at = timezone.now()
         job.save()

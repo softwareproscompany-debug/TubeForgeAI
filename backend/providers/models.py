@@ -209,3 +209,4 @@ class Budget(UUIDModel):
                 fields=["scope_type", "scope_id"], name="uniq_budget_scope"
             ),
         )
+        ordering = ("-created_at",)

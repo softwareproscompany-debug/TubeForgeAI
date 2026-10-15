@@ -32,12 +32,16 @@ class PublicationJobSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "project",
+            "channel",
+            "asset",
             "status",
             "youtube_video_id",
             "upload_session_reference",
             "attempt_count",
             "last_error",
             "published_at",
+            "idempotency_key",
             "created_at",
             "updated_at",
         )
