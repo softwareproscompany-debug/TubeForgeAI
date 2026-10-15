@@ -2,19 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { api, asList, fmtDate } from "../../../lib/api";
-import type { Channel, Project, PublicationJob } from "../../../lib/types";
+import type { Project, PublicationJob } from "../../../lib/types";
 import StatusBadge from "../../../components/StatusBadge";
 
 export default function PublishingPage() {
   const [pubs, setPubs] = useState<PublicationJob[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
   const [form, setForm] = useState({
-    project_id: "", channel_id: "", title: "", description: "", tags: "",
+    project: "", title: "", description: "", tags: "",
     visibility: "private", scheduled_at: "",
   });
 
@@ -22,14 +21,12 @@ export default function PublishingPage() {
     setLoading(true);
     setError(null);
     try {
-      const [p, pr, ch] = await Promise.all([
+      const [p, pr] = await Promise.all([
         api.get<PublicationJob[]>("/publications"),
         api.get<Project[]>("/projects").catch(() => [] as Project[]),
-        api.get<Channel[]>("/channels").catch(() => [] as Channel[]),
       ]);
       setPubs(asList(p));
       setProjects(asList(pr));
-      setChannels(asList(ch));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load publications.");
     } finally {
@@ -40,9 +37,17 @@ export default function PublishingPage() {
   useEffect(() => { load(); }, []);
 
   const action = async (id: string, act: "validate" | "approve" | "schedule" | "cancel") => {
+    // Backend `schedule` requires `scheduled_at` in the body; ask for it.
+    let body: unknown;
+    if (act === "schedule") {
+      const current = pubs.find((p) => p.id === id)?.scheduled_at || "";
+      const input = window.prompt("Schedule at (ISO-8601, e.g. 2026-10-20 18:00 — channel timezone applies):", current);
+      if (!input) return;
+      body = { scheduled_at: input };
+    }
     setActing(id + act);
     try {
-      await api.post(`/publications/${id}/${act}`);
+      await api.post(`/publications/${id}/${act}`, body);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : `${act} failed.`);
@@ -54,9 +59,10 @@ export default function PublishingPage() {
   const create = async () => {
     setActing("create");
     try {
+      // Backend PublicationJobCreateSerializer takes `project` (the channel is
+      // derived from the project) plus an idempotency key.
       await api.post<PublicationJob>("/publications", {
-        project_id: form.project_id || undefined,
-        channel_id: form.channel_id || undefined,
+        project: form.project || undefined,
         title: form.title,
         description: form.description,
         tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
@@ -65,7 +71,7 @@ export default function PublishingPage() {
         idempotency_key: `pub-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       });
       setShowNew(false);
-      setForm({ project_id: "", channel_id: "", title: "", description: "", tags: "", visibility: "private", scheduled_at: "" });
+      setForm({ project: "", title: "", description: "", tags: "", visibility: "private", scheduled_at: "" });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Creation failed.");
@@ -136,17 +142,12 @@ export default function PublishingPage() {
             <h2 className="font-semibold text-studio-text mb-4">New publication</h2>
             <div className="space-y-3 text-sm">
               <Field label="Project">
-                <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className={inputCls}>
+                <select value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value })} className={inputCls}>
                   <option value="">—</option>
                   {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
                 </select>
               </Field>
-              <Field label="Channel">
-                <select value={form.channel_id} onChange={(e) => setForm({ ...form, channel_id: e.target.value })} className={inputCls}>
-                  <option value="">—</option>
-                  {channels.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                </select>
-              </Field>
+              <p className="text-xs text-studio-faint -mt-1">The channel is taken from the selected project.</p>
               <Field label="Title">
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} />
               </Field>

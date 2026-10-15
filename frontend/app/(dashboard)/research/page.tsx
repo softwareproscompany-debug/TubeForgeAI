@@ -36,8 +36,9 @@ export default function ResearchPage() {
     setRunning(true);
     setMsg(null);
     try {
+      // Backend ResearchRunCreateSerializer takes `channel`, not `channel_id`.
       const run = await api.post<ResearchRun>("/research-runs", {
-        channel_id: channelId,
+        channel: channelId,
         query: query.trim(),
         parameters: {},
       });

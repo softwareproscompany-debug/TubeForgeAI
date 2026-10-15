@@ -29,7 +29,8 @@ fi
 cp infra/prod/.env.example infra/prod/.env
 # Generate secrets and paste them into infra/prod/.env:
 openssl rand -base64 48   # -> SECRET_KEY
-openssl rand -base64 32   # -> POSTGRES_PASSWORD
+openssl rand -hex 24       # -> POSTGRES_PASSWORD (hex only: base64 `/`
+                          #    corrupts the DATABASE_URL interpolation)
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # -> FERNET_KEY
 nano infra/prod/.env
 ```

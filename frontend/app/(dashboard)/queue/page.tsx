@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, asList } from "../../../lib/api";
-import type { Channel, GenerationJob, Provider, WorkflowRun } from "../../../lib/types";
+import type { GenerationJob, Provider, WorkflowRun } from "../../../lib/types";
 import StatusBadge from "../../../components/StatusBadge";
 import JobDrawer from "../../../components/JobDrawer";
 
@@ -26,7 +26,6 @@ const LANE_STYLE: Record<string, string> = {
 export default function QueuePage() {
   const [workflows, setWorkflows] = useState<WorkflowRun[]>([]);
   const [jobs, setJobs] = useState<GenerationJob[]>([]);
-  const [channels, setChannels] = useState<Channel[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,15 +37,13 @@ export default function QueuePage() {
   useEffect(() => {
     (async () => {
       try {
-        const [wf, gj, ch, pr] = await Promise.all([
+        const [wf, gj, pr] = await Promise.all([
           api.get<WorkflowRun[]>("/workflows"),
           api.get<GenerationJob[]>("/generation-jobs").catch(() => [] as GenerationJob[]),
-          api.get<Channel[]>("/channels").catch(() => [] as Channel[]),
           api.get<Provider[]>("/providers").catch(() => [] as Provider[]),
         ]);
         setWorkflows(asList(wf));
         setJobs(asList(gj));
-        setChannels(asList(ch));
         setProviders(asList(pr));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load queue.");
@@ -68,7 +65,7 @@ export default function QueuePage() {
   );
   const stages = useMemo(() => Array.from(new Set(workflows.map((w) => w.current_stage).filter(Boolean) as string[])).sort(), [workflows]);
   const filteredJobs = jobs.filter(
-    (j) => (!fStatus || j.status === fStatus) && (!fProvider || j.provider_id === fProvider)
+    (j) => (!fStatus || j.status === fStatus) && (!fProvider || j.provider === fProvider)
   );
 
   return (
@@ -103,19 +100,19 @@ export default function QueuePage() {
         {filteredWorkflows.map((w) => (
           <TaskRow
             key={w.id}
-            title={`${w.workflow_type} · project ${w.project_id.slice(0, 8)}…`}
+            title={`${w.workflow_type} · project ${w.project.slice(0, 8)}…`}
             subtitle={w.current_stage ? `stage: ${w.current_stage.replace(/_/g, " ")}` : w.temporal_workflow_id}
             status={w.status}
             onClick={() => setDrawer({ id: w.id, kind: "workflow" })}
           />
         ))}
         {filteredJobs.map((j) => {
-          const provider = providers.find((p) => p.id === j.provider_id);
+          const provider = providers.find((p) => p.id === j.provider);
           return (
             <TaskRow
               key={j.id}
-              title={`${j.job_type} · model ${j.model_id}`}
-              subtitle={`provider: ${provider?.name || j.provider_id}${j.progress !== null ? ` · ${j.progress}%` : ""}${j.failure_reason ? ` · ${j.failure_reason}` : ""}`}
+              title={`${j.task_type} · model ${j.model_identifier}`}
+              subtitle={`provider: ${provider?.name || j.provider_name || j.provider}${j.error_message ? ` · ${j.error_message}` : ""}`}
               status={j.status}
               onClick={() => setDrawer({ id: j.id, kind: "generation" })}
             />

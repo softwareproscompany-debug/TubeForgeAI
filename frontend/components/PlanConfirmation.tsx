@@ -5,8 +5,8 @@ import { fmtUsd } from "../lib/api";
 
 // Safety: a generated plan is a draft only. It becomes durable and
 // executes consequential actions ONLY after the operator presses Start,
-// which calls POST /workflows. Consequential steps (publish, paid spend)
-// keep their approval checkpoints regardless of plan confirmation.
+// which calls POST /projects/{id}/workflows. Consequential steps (publish,
+// paid spend) keep their approval checkpoints regardless of plan confirmation.
 
 export default function PlanConfirmation({
   plan,
@@ -21,16 +21,21 @@ export default function PlanConfirmation({
   onDiscard: () => void;
   starting: boolean;
 }) {
+  const stages = [...(plan.stages || [])].sort((a, b) => a.order - b.order);
   return (
     <div className="bg-studio-panel border border-accent/40 rounded-lg p-5 space-y-5">
       <div>
-        <div className="text-xs uppercase tracking-wider text-studio-muted">Interpreted goal</div>
-        <p className="mt-1 text-studio-text">{plan.interpreted_goal}</p>
+        <div className="text-xs uppercase tracking-wider text-studio-muted">Plan summary</div>
+        <p className="mt-1 text-studio-text">
+          {plan.scene_count_estimate} estimated scene{plan.scene_count_estimate === 1 ? "" : "s"} ·{" "}
+          {plan.estimated_duration.estimate ? "heuristic estimate" : "estimate"} via{" "}
+          <span className="font-mono text-xs">{plan.estimated_duration.method}</span>
+        </p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-        <Stat label="Expected duration" value={`${Math.round(plan.expected_duration_s)}s`} />
-        <Stat label="Estimated cost" value={fmtUsd(plan.estimated_cost_usd)} />
+        <Stat label="Expected duration" value={`${plan.estimated_duration.total_minutes} min`} />
+        <Stat label="Estimated cost" value={fmtUsd(plan.estimated_cost.amount_usd)} />
         <Stat label="Models" value={plan.models.length ? plan.models.join(", ") : "—"} />
         <Stat label="Project" value={projectId.slice(0, 8) + "…"} />
       </div>
@@ -38,16 +43,13 @@ export default function PlanConfirmation({
       <div>
         <div className="text-xs uppercase tracking-wider text-studio-muted mb-2">Stages</div>
         <ol className="space-y-1.5">
-          {plan.stages.map((s, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm bg-studio-panel2 border border-studio-border rounded p-2.5">
-              <span className="text-accent font-mono">{String(i + 1).padStart(2, "0")}</span>
+          {stages.map((s) => (
+            <li key={s.order} className="flex items-start gap-3 text-sm bg-studio-panel2 border border-studio-border rounded p-2.5">
+              <span className="text-accent font-mono">{String(s.order + 1).padStart(2, "0")}</span>
               <div>
-                <div className="text-studio-text font-medium">{s.stage}</div>
-                <div className="text-studio-muted text-xs">{s.description}</div>
+                <div className="text-studio-text font-medium">{s.name.replace(/_/g, " ")}</div>
                 <div className="text-studio-faint text-xs mt-0.5">
-                  {s.model ? `model: ${s.model}` : ""}
-                  {s.estimated_duration_s ? ` · ${Math.round(s.estimated_duration_s)}s` : ""}
-                  {s.estimated_cost_usd ? ` · ${fmtUsd(s.estimated_cost_usd)}` : ""}
+                  {s.requires_approval ? "approval checkpoint" : "automatic"}
                 </div>
               </div>
             </li>
@@ -55,13 +57,13 @@ export default function PlanConfirmation({
         </ol>
       </div>
 
-      {plan.approval_checkpoints.length > 0 && (
+      {plan.approvals.length > 0 && (
         <div>
           <div className="text-xs uppercase tracking-wider text-studio-muted mb-2">Approval checkpoints</div>
           <ul className="space-y-1">
-            {plan.approval_checkpoints.map((c, i) => (
+            {plan.approvals.map((c, i) => (
               <li key={i} className="text-sm text-amber-400 flex gap-2">
-                <span>⏸</span> {c}
+                <span>⏸</span> {c.replace(/_/g, " ")}
               </li>
             ))}
           </ul>
@@ -71,9 +73,9 @@ export default function PlanConfirmation({
         </div>
       )}
 
-      {Object.keys(plan.resource_requirements).length > 0 && (
+      {plan.estimated_cost.disclaimer && (
         <div className="text-xs text-studio-faint">
-          Resources: {Object.entries(plan.resource_requirements).map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}
+          Cost basis: <span className="font-mono">{plan.estimated_cost.method}</span> — {plan.estimated_cost.disclaimer}
         </div>
       )}
 

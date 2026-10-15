@@ -1,4 +1,7 @@
-// TubeForge AI API contract types — mirror of backend contract. No mock data.
+// TubeForge AI API contract types — mirror of backend serializers. No mock data.
+//
+// FK relations are serialized as plain UUID strings by DRF (e.g. `channel`,
+// not `channel_id`); these types match the backend field names exactly.
 
 export interface ApiErrorBody {
   code: string;
@@ -16,14 +19,17 @@ export interface Paginated<T> {
 
 export interface User {
   id: string;
+  username: string;
   email: string;
-  display_name: string;
+  first_name: string;
+  last_name: string;
+  date_joined: string;
 }
 
 // ── Channels ──────────────────────────────────────────────
 export interface Channel {
   id: string;
-  youtube_channel_id: string;
+  youtube_channel_id: string | null;
   title: string;
   description: string;
   default_language: string;
@@ -37,16 +43,18 @@ export interface Channel {
 // ── Research ──────────────────────────────────────────────
 export interface ResearchRun {
   id: string;
-  channel_id: string;
+  channel: string;
   query: string;
   parameters: Record<string, unknown>;
   status: string;
-  created_at: string;
+  started_at: string | null;
   completed_at: string | null;
+  created_at: string;
 }
 
 export interface ContentIdea {
   id: string;
+  channel: string;
   title: string;
   topic: string;
   format: string;
@@ -61,7 +69,8 @@ export type ProjectStatus = string;
 
 export interface Project {
   id: string;
-  channel_id: string;
+  channel: string;
+  content_idea: string | null;
   title: string;
   brief: string;
   format: string;
@@ -73,44 +82,54 @@ export interface Project {
   settings: Record<string, unknown>;
 }
 
+// Backend GeneratePlanView response shape (heuristic plan; every estimate is
+// explicitly labeled as such — see estimated_duration.estimate).
 export interface PlanStage {
-  stage: string;
-  description: string;
-  model: string | null;
-  estimated_duration_s: number | null;
-  estimated_cost_usd: number | null;
+  name: string;
+  order: number;
+  requires_approval: boolean;
 }
 
 export interface Plan {
-  interpreted_goal: string;
-  channel_id: string;
   stages: PlanStage[];
-  expected_duration_s: number;
-  estimated_cost_usd: number;
+  scene_count_estimate: number;
+  estimated_duration: {
+    estimate: boolean;
+    total_minutes: number;
+    method: string;
+  };
+  estimated_cost: {
+    estimate: boolean;
+    amount_usd: number;
+    method: string;
+    disclaimer: string;
+  };
   models: string[];
-  approval_checkpoints: string[];
-  resource_requirements: Record<string, unknown>;
+  approvals: string[];
 }
 
 export interface ScriptVersion {
   id: string;
-  project_id: string;
-  version: number;
-  title: string;
-  content: string;
-  status: string;
+  project: string;
+  version_number: number;
+  structured_script: Record<string, unknown> | null;
+  rendered_text: string;
+  fact_check_status: string;
+  approval_status: string;
   created_at: string;
 }
 
 export interface Scene {
   id: string;
-  project_id: string;
-  order: number;
-  title: string;
-  description: string;
-  prompt: string | null;
+  project: string;
+  position: number;
+  script_segment: string;
+  visual_prompt: string;
+  negative_prompt: string;
+  duration_seconds: number | null;
+  scene_type: string;
   status: string;
-  asset_id: string | null;
+  created_at: string;
 }
 
 // ── Workflows ─────────────────────────────────────────────
@@ -125,13 +144,16 @@ export type WorkflowState = typeof WORKFLOW_STATES[number];
 
 export interface WorkflowRun {
   id: string;
-  project_id: string;
+  project: string;
   workflow_type: string;
   temporal_workflow_id: string;
   status: WorkflowState;
-  current_stage: string | null;
+  current_stage: string;
+  input_snapshot: Record<string, unknown>;
+  output_summary: Record<string, unknown>;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export interface WorkflowEvent {
@@ -140,6 +162,19 @@ export interface WorkflowEvent {
   stage: string | null;
   payload: Record<string, unknown>;
   occurred_at: string;
+}
+
+export interface Approval {
+  id: string;
+  project: string;
+  workflow_run: string | null;
+  approval_type: string;
+  status: string;
+  requested_by: string;
+  decided_by: string | null;
+  decision_reason: string;
+  requested_at: string;
+  decided_at: string | null;
 }
 
 // ── Providers / models / resources ────────────────────────
@@ -153,32 +188,39 @@ export interface Provider {
   enabled: boolean;
   priority: number;
   health_status: string;
-  latency_ms?: number | null;
-  pricing?: Record<string, unknown> | null;
-  concurrency?: number | null;
+  configuration: Record<string, unknown>;
 }
 
 export interface AIModel {
   id: string;
-  provider_id: string;
-  name: string;
-  model_type: string;
-  capabilities: string[];
+  provider: string;
+  model_identifier: string;
+  model_version: string;
+  task_type: string;
+  hardware_requirements: Record<string, unknown> | null;
+  quality_profile: string;
+  license_metadata: Record<string, unknown> | null;
   enabled: boolean;
 }
 
 export interface GenerationJob {
   id: string;
-  project_id: string | null;
-  provider_id: string;
-  model_id: string;
-  job_type: string;
+  project: string | null;
+  scene: string | null;
+  provider: string;
+  provider_name: string;
+  model: string;
+  model_identifier: string;
+  task_type: string;
   status: string;
-  progress: number | null;
-  failure_reason: string | null;
-  retry_count: number;
+  attempt_count: number;
+  estimated_cost: number | null;
+  actual_cost: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export interface ResourceUsageEvent {
@@ -193,15 +235,18 @@ export interface ResourceUsageEvent {
 
 export interface Budget {
   id: string;
-  scope: string;
-  period: string;
-  limit_usd: number;
-  spent_usd: number;
+  scope_type: string;
+  scope_id: string | null;
+  limits: Record<string, number>;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Media ─────────────────────────────────────────────────
 export interface Asset {
   id: string;
+  project: string | null;
+  scene: string | null;
   asset_type: string;
   mime_type: string;
   sha256: string;
@@ -236,11 +281,25 @@ export interface TimelineV1 {
   tracks: TimelineTrack[];
 }
 
+// Backend TimelineVersion row wrapping a TimelineV1 document.
+export interface TimelineVersionRow {
+  id: string;
+  project: string;
+  version_number: number;
+  timeline_json: TimelineV1;
+  render_settings: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface RenderJob {
   id: string;
-  project_id: string;
+  project: string;
+  timeline_version: string;
   status: string;
-  output_asset_id: string | null;
+  output_asset: string | null;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
 }
 
@@ -254,8 +313,13 @@ export type UploadState = typeof UPLOAD_STATES[number];
 
 export interface PublicationJob {
   id: string;
+  project: string;
+  channel: string;
+  asset: string | null;
   youtube_video_id: string | null;
   title: string;
+  description: string;
+  tags: string[];
   visibility: string;
   scheduled_at: string | null;
   status: UploadState;
@@ -269,6 +333,8 @@ export type MetricSource = "YOUTUBE_API" | "CALCULATED" | "AI_INTERPRETATION" | 
 
 export interface AnalyticsSnapshot {
   id: string;
+  channel: string;
+  youtube_video_id: string | null;
   metrics: Record<string, number>;
   source: MetricSource;
   captured_at: string;
@@ -277,7 +343,9 @@ export interface AnalyticsSnapshot {
 // ── Ops ───────────────────────────────────────────────────
 export interface HealthStatus {
   status: string;
-  checks: Record<string, { status: string; detail?: string }>;
+  // Backend HealthView returns plain string values: "ok", "not_configured",
+  // "unreachable", "error: ...", etc.
+  checks: Record<string, string>;
   gpu?: Record<string, unknown> | null;
   cpu_percent?: number | null;
   ram_percent?: number | null;
@@ -300,18 +368,20 @@ export interface AuditEvent {
 
 export interface Notification {
   id: string;
+  type: string;
   title: string;
   body: string;
-  severity: string;
-  read: boolean;
+  resource_type: string;
+  resource_id: string;
+  read_at: string | null;
   created_at: string;
 }
 
 export interface AutomationRule {
   id: string;
-  channel_id: string;
+  channel: string;
   name: string;
-  trigger: string;
+  trigger_type: string;
   conditions: Record<string, unknown>;
   actions: Record<string, unknown>;
   enabled: boolean;

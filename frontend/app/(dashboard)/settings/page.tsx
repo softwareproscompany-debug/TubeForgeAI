@@ -8,7 +8,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // login
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
 
@@ -23,8 +23,11 @@ export default function SettingsPage() {
     setAuthed(!!getToken());
     (async () => {
       try {
-        const me = await api.get<{ display_name?: string }>("/auth/me").catch(() => null);
-        if (me?.display_name) setDisplayName(me.display_name);
+        // Backend UserSerializer exposes first_name (display name is stored
+        // there), username and email — there is no display_name column.
+        const me = await api.get<{ first_name?: string; username?: string; email?: string }>("/auth/me").catch(() => null);
+        const name = me?.first_name || me?.username || me?.email;
+        if (name) setDisplayName(name);
       } catch { /* optional */ }
     })();
   }, []);
@@ -33,17 +36,24 @@ export default function SettingsPage() {
     setError(null);
     setMsg(null);
     try {
-      const res = await api.post<{ token: string; user: { display_name: string } }>("/auth/login", { email, password }, false);
+      // Backend LoginSerializer authenticates on `username`, not `email`.
+      const res = await api.post<{ token: string; user: { first_name?: string; username?: string; email?: string } }>(
+        "/auth/login",
+        { username, password },
+        false
+      );
       setToken(res.token);
       setAuthed(true);
-      setDisplayName(res.user.display_name);
+      setDisplayName(res.user.first_name || res.user.username || res.user.email || "");
       setMsg("Logged in. Token stored in localStorage ('tf_token').");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed.");
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Revoke the token server-side first; the backend deletes it on logout.
+    await api.post("/auth/logout").catch(() => {});
     setToken(null);
     setAuthed(false);
     setMsg("Logged out. Token cleared.");
@@ -91,14 +101,14 @@ export default function SettingsPage() {
         ) : (
           <div className="space-y-3 text-sm">
             <label className="block">
-              <span className="text-studio-muted text-xs">Email</span>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={cls} />
+              <span className="text-studio-muted text-xs">Username</span>
+              <input value={username} onChange={(e) => setUsername(e.target.value)} className={cls} />
             </label>
             <label className="block">
               <span className="text-studio-muted text-xs">Password</span>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={cls} />
             </label>
-            <button onClick={login} disabled={!email || !password}
+            <button onClick={login} disabled={!username || !password}
               className="bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
               Log in
             </button>

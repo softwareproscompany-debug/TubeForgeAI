@@ -2,8 +2,11 @@
 # Build context is the repo root:  docker build -f infra/prod/Dockerfile.web .
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY frontend/package.json ./
-RUN npm install --no-audit --no-fund
+# Copy the lockfile too and use `npm ci`: reproducible, pinned installs.
+# (Plain `npm install` would float deps on every rebuild — dangerous with
+# ranges like ^16.0.0.)
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 FROM node:20-alpine AS builder
 WORKDIR /app
