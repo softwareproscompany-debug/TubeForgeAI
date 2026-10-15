@@ -40,9 +40,14 @@ export default function CommandCenterPage() {
     setPlan(null);
     setStartedRun(null);
     try {
+      // Backend GeneratePlanView reads `format` / `target_duration_seconds`
+      // from the body (validating format against its choices); `prompt` is
+      // forwarded for future AI planning support.
+      const project = projects.find((x) => x.id === projectId);
       const p = await api.post<Plan>(`/projects/${projectId}/generate-plan`, {
         prompt: prompt.trim(),
-        channel_id: channelId || undefined,
+        format: project?.format,
+        target_duration_seconds: project?.target_duration_seconds,
       });
       setPlan(p);
     } catch (e) {
@@ -57,8 +62,9 @@ export default function CommandCenterPage() {
     setStarting(true);
     setError(null);
     try {
+      // Backend WorkflowRun.TYPE_CHOICES: VIDEO_PRODUCTION | SHORTS_BATCH | PUBLISH_ONLY.
       const run = await api.post<WorkflowRun>(`/projects/${projectId}/workflows`, {
-        workflow_type: "full_production",
+        workflow_type: "VIDEO_PRODUCTION",
       });
       setStartedRun(run);
       setPlan(null);

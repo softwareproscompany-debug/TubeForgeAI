@@ -22,7 +22,7 @@ const STEPS = [
 
 interface Draft {
   objective: string;
-  channel_id: string;
+  channel: string;
   title: string;
   format: string;
   aspect_ratio: string;
@@ -36,9 +36,9 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = {
   objective: "",
-  channel_id: "",
+  channel: "",
   title: "",
-  format: "long_form",
+  format: "LONG_FORM",
   aspect_ratio: "16:9",
   language: "en",
   target_duration_seconds: 600,
@@ -47,6 +47,9 @@ const EMPTY_DRAFT: Draft = {
   model_preferences: "",
   plan_notes: "",
 };
+
+// Backend Project.FORMAT_CHOICES — the wizard may only offer values the API accepts.
+const FORMAT_OPTIONS = ["LONG_FORM", "SHORT", "DOCUMENTARY", "EXPLAINER", "CINEMATIC"];
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -69,7 +72,7 @@ export default function ProjectsPage() {
         setProjects(asList(p));
         const ch = asList(c);
         setChannels(ch);
-        if (ch.length > 0) setDraft((d) => ({ ...d, channel_id: d.channel_id || ch[0].id }));
+        if (ch.length > 0) setDraft((d) => ({ ...d, channel: d.channel || ch[0].id }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load projects.");
       } finally {
@@ -85,7 +88,7 @@ export default function ProjectsPage() {
     setWizardError(null);
     try {
       const p = await api.post<Project>("/projects", {
-        channel_id: draft.channel_id,
+        channel: draft.channel,
         title: draft.title || draft.objective.slice(0, 80) || "Untitled project",
         brief: draft.objective,
         format: draft.format,
@@ -112,7 +115,7 @@ export default function ProjectsPage() {
 
   const canNext = () => {
     if (step === 0) return draft.objective.trim().length > 0;
-    if (step === 1) return !!draft.channel_id && !!draft.title.trim();
+    if (step === 1) return !!draft.channel && !!draft.title.trim();
     return true;
   };
 
@@ -181,7 +184,7 @@ export default function ProjectsPage() {
                 <>
                   <label className="block text-sm">
                     <span className="text-studio-muted">Channel</span>
-                    <select value={draft.channel_id} onChange={(e) => set("channel_id", e.target.value)}
+                    <select value={draft.channel} onChange={(e) => set("channel", e.target.value)}
                       className="mt-1 w-full bg-studio-panel2 border border-studio-border rounded-md px-3 py-2 text-studio-text">
                       {channels.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
                     </select>
@@ -196,10 +199,9 @@ export default function ProjectsPage() {
                       <span className="text-studio-muted">Format</span>
                       <select value={draft.format} onChange={(e) => set("format", e.target.value)}
                         className="mt-1 w-full bg-studio-panel2 border border-studio-border rounded-md px-3 py-2 text-studio-text">
-                        <option value="long_form">Long form</option>
-                        <option value="short">Short</option>
-                        <option value="live">Live</option>
-                        <option value="premiere">Premiere</option>
+                        {FORMAT_OPTIONS.map((f) => (
+                          <option key={f} value={f}>{f.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}</option>
+                        ))}
                       </select>
                     </label>
                     <label className="block text-sm">

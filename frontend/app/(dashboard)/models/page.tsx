@@ -92,10 +92,10 @@ export default function ModelsPage() {
                 <StatusBadge status={p.enabled ? "HEALTHY" : "PAUSED"} />
               </div>
             </div>
-            <div className="mt-3 grid sm:grid-cols-4 gap-2 text-xs">
-              <Spec k="Latency" v={p.latency_ms !== null && p.latency_ms !== undefined ? `${p.latency_ms} ms` : "—"} />
-              <Spec k="Concurrency" v={p.concurrency !== null && p.concurrency !== undefined ? String(p.concurrency) : "—"} />
-              <Spec k="Pricing" v={p.pricing ? JSON.stringify(p.pricing) : "—"} />
+            <div className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
+              <Spec k="Adapter" v={p.adapter_type} />
+              <Spec k="Deployment" v={p.deployment_type} />
+              <Spec k="Priority" v={String(p.priority)} />
               <Spec k="Capabilities" v={p.capabilities.length ? p.capabilities.join(", ") : "—"} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -126,20 +126,22 @@ export default function ModelsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-studio-faint border-b border-studio-border">
-                  <th className="px-4 py-2">Name</th>
-                  <th className="px-4 py-2">Type</th>
+                  <th className="px-4 py-2">Model</th>
+                  <th className="px-4 py-2">Task type</th>
+                  <th className="px-4 py-2">Version</th>
                   <th className="px-4 py-2">Provider</th>
-                  <th className="px-4 py-2">Capabilities</th>
+                  <th className="px-4 py-2">Quality profile</th>
                   <th className="px-4 py-2">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {models.map((m) => (
                   <tr key={m.id} className="border-b border-studio-border/50">
-                    <td className="px-4 py-2 text-studio-text">{m.name}</td>
-                    <td className="px-4 py-2 text-studio-muted">{m.model_type}</td>
-                    <td className="px-4 py-2 text-studio-muted font-mono text-xs">{m.provider_id.slice(0, 12)}…</td>
-                    <td className="px-4 py-2 text-studio-muted text-xs">{m.capabilities.join(", ")}</td>
+                    <td className="px-4 py-2 text-studio-text">{m.model_identifier}</td>
+                    <td className="px-4 py-2 text-studio-muted">{m.task_type}</td>
+                    <td className="px-4 py-2 text-studio-muted text-xs">{m.model_version || "—"}</td>
+                    <td className="px-4 py-2 text-studio-muted font-mono text-xs">{m.provider.slice(0, 12)}…</td>
+                    <td className="px-4 py-2 text-studio-muted text-xs">{m.quality_profile || "—"}</td>
                     <td className="px-4 py-2"><StatusBadge status={m.enabled ? "HEALTHY" : "PAUSED"} /></td>
                   </tr>
                 ))}

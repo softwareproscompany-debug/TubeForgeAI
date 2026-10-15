@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, asList } from "../../../lib/api";
-import type { Asset, Project, RenderJob, Scene, TimelineClip, TimelineV1 } from "../../../lib/types";
+import type { Asset, Project, RenderJob, Scene, TimelineClip, TimelineV1, TimelineVersionRow } from "../../../lib/types";
 import TimelineEditor from "../../../components/TimelineEditor";
 
 const DEFAULT_TIMELINE: TimelineV1 = {
@@ -45,14 +45,19 @@ export default function EditorPage() {
   useEffect(() => {
     if (!projectId) return;
     (async () => {
-      const [a, s, t] = await Promise.all([
+      // Backend GET /timeline returns a TimelineVersion row wrapping the
+      // TimelineV1 document in `timeline_json` (404 when none saved yet).
+      const [a, s, t, r] = await Promise.all([
         api.get<Asset[]>("/assets").catch(() => [] as Asset[]),
         api.get<Scene[]>(`/projects/${projectId}/scenes`).catch(() => [] as Scene[]),
-        api.get<TimelineV1>(`/projects/${projectId}/timeline`).catch(() => null),
+        api.get<TimelineVersionRow>(`/projects/${projectId}/timeline`).catch(() => null),
+        api.get<RenderJob[]>(`/projects/${projectId}/renders`).catch(() => [] as RenderJob[]),
       ]);
       setAssets(asList(a));
       setScenes(asList(s));
-      setTimeline(t || DEFAULT_TIMELINE);
+      const doc = t?.timeline_json;
+      setTimeline(doc && Array.isArray(doc.tracks) ? doc : DEFAULT_TIMELINE);
+      setRenders(asList(r));
       setHistory({ past: [], future: [] });
       setSelectedClip(null);
     })();
@@ -123,15 +128,21 @@ export default function EditorPage() {
     });
   };
 
-  const save = async () => {
-    if (!projectId) return;
+  const save = async (): Promise<string | null> => {
+    if (!projectId) return null;
     setSaving(true);
     setMsg(null);
     try {
-      await api.post(`/projects/${projectId}/timeline`, timeline);
+      // Backend TimelineView expects the document under `timeline_json` and
+      // returns the saved TimelineVersion row (its `id` is what renders need).
+      const row = await api.post<{ id: string }>(`/projects/${projectId}/timeline`, {
+        timeline_json: timeline,
+      });
       setMsg("Timeline saved.");
+      return row.id;
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Save failed.");
+      return null;
     } finally {
       setSaving(false);
     }
@@ -142,7 +153,16 @@ export default function EditorPage() {
     setRendering(true);
     setMsg(null);
     try {
-      const job = await api.post<RenderJob>(`/projects/${projectId}/renders`, { timeline_version: timeline.version });
+      // Render jobs reference a saved TimelineVersion row by its DB id —
+      // save first so the render points at exactly what is on screen.
+      const versionId = await save();
+      if (!versionId) {
+        setMsg("Render aborted: timeline could not be saved.");
+        return;
+      }
+      const job = await api.post<RenderJob>(`/projects/${projectId}/renders`, {
+        timeline_version_id: versionId,
+      });
       setRenders((r) => [job, ...r]);
       setMsg(`Render job ${job.id.slice(0, 8)}… submitted.`);
     } catch (e) {
@@ -212,8 +232,8 @@ export default function EditorPage() {
                 ? <p className="text-xs text-studio-faint p-2">No scenes for this project yet.</p>
                 : scenes.map((s) => (
                     <div key={s.id} className="bg-studio-panel2 border border-studio-border rounded p-2">
-                      <div className="text-xs text-studio-text"><span className="text-accent font-mono mr-1">{String(s.order).padStart(2, "0")}</span>{s.title}</div>
-                      <div className="text-[11px] text-studio-faint mt-0.5">{s.description}</div>
+                      <div className="text-xs text-studio-text"><span className="text-accent font-mono mr-1">{String(s.position).padStart(2, "0")}</span>{s.visual_prompt || "(untitled scene)"}</div>
+                      <div className="text-[11px] text-studio-faint mt-0.5">{s.script_segment}</div>
                     </div>
                   ))
             )}

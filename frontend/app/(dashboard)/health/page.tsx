@@ -52,9 +52,10 @@ export default function HealthPage() {
 
   const alerts: string[] = [];
   if (health.workflow_failures_24h) alerts.push(`${health.workflow_failures_24h} workflow failures in the last 24h`);
+  // Backend HealthView returns checks as plain strings: "ok", "not_configured",
+  // "unreachable", "error: ...", etc.
   Object.entries(health.checks || {}).forEach(([k, v]) => {
-    if (v.status.toUpperCase() !== "OK" && v.status.toUpperCase() !== "HEALTHY")
-      alerts.push(`${k}: ${v.status}${v.detail ? ` — ${v.detail}` : ""}`);
+    if (v !== "ok" && v !== "not_configured") alerts.push(`${k}: ${v}`);
   });
   providers.filter((p) => p.health_status.toUpperCase() !== "HEALTHY").forEach((p) =>
     alerts.push(`Provider ${p.name}: ${p.health_status}`)
@@ -107,8 +108,8 @@ export default function HealthPage() {
               <li key={k} className="flex items-center justify-between text-sm">
                 <span className="text-studio-text">{k}</span>
                 <span className="flex items-center gap-2">
-                  {v.detail && <span className="text-xs text-studio-faint">{v.detail}</span>}
-                  <StatusBadge status={v.status} />
+                  <span className="text-xs text-studio-faint font-mono">{v}</span>
+                  <StatusBadge status={v === "ok" ? "HEALTHY" : v === "not_configured" ? "PAUSED" : "UNHEALTHY"} />
                 </span>
               </li>
             ))}
@@ -141,7 +142,7 @@ export default function HealthPage() {
             {failures.slice(0, 10).map((w) => (
               <li key={w.id} className="text-sm flex justify-between gap-3">
                 <span className="text-studio-text font-mono text-xs">{w.id.slice(0, 12)}… · {w.workflow_type}</span>
-                <span className="text-xs text-studio-faint">{fmtDate(w.updated_at)}</span>
+                <span className="text-xs text-studio-faint">{fmtDate(w.completed_at || w.created_at)}</span>
               </li>
             ))}
           </ul>

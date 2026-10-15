@@ -29,8 +29,9 @@ export default function ProjectDetailPage() {
         api.get<WorkflowRun[]>(`/workflows?project_id=${projectId}`).catch(() => [] as WorkflowRun[]),
       ]);
       setProject(p);
-      setScripts(asList(sc).sort((a, b) => b.version - a.version));
-      setScenes(asList(sn).sort((a, b) => a.order - b.order));
+      // Backend ScriptVersion uses `version_number`; Scene uses `position`.
+      setScripts(asList(sc).sort((a, b) => b.version_number - a.version_number));
+      setScenes(asList(sn).sort((a, b) => a.position - b.position));
       setWorkflows(asList(wf));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load project.");
@@ -98,16 +99,16 @@ export default function ProjectDetailPage() {
             {scripts.map((s) => (
               <li key={s.id} className="bg-studio-panel2 border border-studio-border rounded p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm text-studio-text font-medium">v{s.version} — {s.title}</div>
+                  <div className="text-sm text-studio-text font-medium">v{s.version_number} — {s.fact_check_status}</div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge status={s.status} />
-                    {s.status.toUpperCase() !== "APPROVED" && (
+                    <StatusBadge status={s.approval_status} />
+                    {s.approval_status.toUpperCase() !== "APPROVED" && (
                       <button onClick={() => approveScript(s.id)} className="text-xs text-accent hover:underline">Approve</button>
                     )}
                   </div>
                 </div>
                 <div className="text-xs text-studio-faint mt-1">{fmtDate(s.created_at)}</div>
-                <p className="text-xs text-studio-muted mt-2 whitespace-pre-wrap line-clamp-4">{s.content}</p>
+                <p className="text-xs text-studio-muted mt-2 whitespace-pre-wrap line-clamp-4">{s.rendered_text}</p>
               </li>
             ))}
           </ul>
@@ -126,8 +127,8 @@ export default function ProjectDetailPage() {
             {scenes.map((sc) => (
               <li key={sc.id} className="bg-studio-panel2 border border-studio-border rounded p-3 flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm text-studio-text"><span className="text-accent font-mono mr-2">{String(sc.order).padStart(2, "0")}</span>{sc.title}</div>
-                  <div className="text-xs text-studio-muted mt-1">{sc.description}</div>
+                  <div className="text-sm text-studio-text"><span className="text-accent font-mono mr-2">{String(sc.position).padStart(2, "0")}</span>{sc.visual_prompt || "(untitled scene)"}</div>
+                  <div className="text-xs text-studio-muted mt-1">{sc.script_segment}</div>
                 </div>
                 <StatusBadge status={sc.status} />
               </li>

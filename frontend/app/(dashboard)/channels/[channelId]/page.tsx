@@ -173,7 +173,7 @@ function ChannelCalendarTab({ channelId }: { channelId: string }) {
   useEffect(() => {
     (async () => {
       const data = asList(await api.get<PublicationJob[]>("/publications").catch(() => [] as PublicationJob[]));
-      setPubs(data.filter((p) => p.scheduled_at));
+      setPubs(data.filter((p) => p.scheduled_at && p.channel === channelId));
     })();
   }, [channelId]);
   return (
@@ -276,7 +276,7 @@ function AutomationTab({ channelId }: { channelId: string }) {
           <div key={r.id} className="bg-studio-panel border border-studio-border rounded-lg p-4 flex items-center justify-between">
             <div>
               <div className="text-sm text-studio-text font-medium">{r.name}</div>
-              <div className="text-xs text-studio-faint">trigger: {r.trigger}</div>
+              <div className="text-xs text-studio-faint">trigger: {r.trigger_type}</div>
             </div>
             <StatusBadge status={r.enabled ? "HEALTHY" : "PAUSED"} />
           </div>
