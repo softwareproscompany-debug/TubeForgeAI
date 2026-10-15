@@ -1,39 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, asList } from "../../../lib/api";
-import type { Asset, Project, RenderJob, Scene, TimelineClip, TimelineV1, TimelineVersionRow } from "../../../lib/types";
-import TimelineEditor from "../../../components/TimelineEditor";
-
-const DEFAULT_TIMELINE: TimelineV1 = {
-  version: 1,
-  tracks: [
-    { id: "v1", kind: "video", name: "Video 1", clips: [] },
-    { id: "a1", kind: "audio", name: "Narration", clips: [] },
-    { id: "c1", kind: "caption", name: "Captions", clips: [] },
-  ],
-};
+import type { Asset, Project, RenderJob, Scene } from "../../../lib/types";
+import {
+  blankEDL,
+  clipEnd,
+  isEDLDocument,
+  normalizeEDL,
+  uid,
+  type EDL,
+  type EDLClip,
+  type EDLTrackType,
+} from "../../../lib/edl";
+import VideoEditor, { type ClipSelection } from "../../../components/video-editor/VideoEditor";
+import PreviewPlayer from "../../../components/video-editor/PreviewPlayer";
+import Inspector from "../../../components/video-editor/Inspector";
 
 interface HistoryEntry {
-  past: TimelineV1[];
-  future: TimelineV1[];
+  past: EDL[];
+  future: EDL[];
 }
+
+const TERMINAL = new Set(["COMPLETED", "FAILED", "CANCELED"]);
 
 export default function EditorPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
   const [assets, setAssets] = useState<Asset[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
-  const [timeline, setTimeline] = useState<TimelineV1>(DEFAULT_TIMELINE);
+  const [edl, setEdl] = useState<EDL>(blankEDL());
   const [history, setHistory] = useState<HistoryEntry>({ past: [], future: [] });
   const [leftTab, setLeftTab] = useState<"assets" | "scenes">("assets");
-  const [selectedClip, setSelectedClip] = useState<TimelineClip | null>(null);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [selected, setSelected] = useState<ClipSelection | null>(null);
+  const [playhead, setPlayhead] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renders, setRenders] = useState<RenderJob[]>([]);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
+  const edlRef = useRef(edl);
+  edlRef.current = edl;
+  const playheadRef = useRef(playhead);
+  playheadRef.current = playhead;
+
+  // -- load -----------------------------------------------------------------
   useEffect(() => {
     (async () => {
       const p = asList(await api.get<Project[]>("/projects").catch(() => [] as Project[]));
@@ -45,98 +58,186 @@ export default function EditorPage() {
   useEffect(() => {
     if (!projectId) return;
     (async () => {
-      // Backend GET /timeline returns a TimelineVersion row wrapping the
-      // TimelineV1 document in `timeline_json` (404 when none saved yet).
       const [a, s, t, r] = await Promise.all([
         api.get<Asset[]>("/assets").catch(() => [] as Asset[]),
         api.get<Scene[]>(`/projects/${projectId}/scenes`).catch(() => [] as Scene[]),
-        api.get<TimelineVersionRow>(`/projects/${projectId}/timeline`).catch(() => null),
+        api.get<{ timeline_json: unknown }>(`/projects/${projectId}/timeline`).catch(() => null),
         api.get<RenderJob[]>(`/projects/${projectId}/renders`).catch(() => [] as RenderJob[]),
       ]);
       setAssets(asList(a));
       setScenes(asList(s));
       const doc = t?.timeline_json;
-      setTimeline(doc && Array.isArray(doc.tracks) ? doc : DEFAULT_TIMELINE);
+      const next = isEDLDocument(doc) ? normalizeEDL(doc) : blankEDL();
+      setEdl(next);
       setRenders(asList(r));
       setHistory({ past: [], future: [] });
-      setSelectedClip(null);
+      setSelected(null);
+      setPlayhead(0);
+      setPlaying(false);
+      setActiveJobId(null);
     })();
   }, [projectId]);
 
-  // Client-side undo/redo stack — every timeline mutation pushes history.
-  const commit = (next: TimelineV1) => {
-    setHistory((h) => ({ past: [...h.past.slice(-49), timeline], future: [] }));
-    setTimeline(next);
-    syncSelection(next);
-  };
+  // -- history ---------------------------------------------------------------
+  const commit = useCallback((next: EDL) => {
+    setHistory((h) => ({ past: [...h.past.slice(-49), edlRef.current], future: [] }));
+    setEdl(next);
+    // Drop the selection if its clip no longer exists.
+    setSelected((sel) => {
+      if (!sel) return null;
+      const track = next.tracks.find((t) => t.id === sel.trackId);
+      return track?.clips.some((c) => c.id === sel.clipId) ? sel : null;
+    });
+  }, []);
 
   const undo = () => {
     setHistory((h) => {
       if (h.past.length === 0) return h;
       const prev = h.past[h.past.length - 1];
-      setTimeline(prev);
-      syncSelection(prev);
-      return { past: h.past.slice(0, -1), future: [timeline, ...h.future] };
+      setEdl(prev);
+      return { past: h.past.slice(0, -1), future: [edlRef.current, ...h.future] };
     });
+    setSelected(null);
   };
-
   const redo = () => {
     setHistory((h) => {
       if (h.future.length === 0) return h;
       const next = h.future[0];
-      setTimeline(next);
-      syncSelection(next);
-      return { past: [...h.past, timeline], future: h.future.slice(1) };
+      setEdl(next);
+      return { past: [...h.past, edlRef.current], future: h.future.slice(1) };
+    });
+    setSelected(null);
+  };
+
+  // -- playback ---------------------------------------------------------------
+  useEffect(() => {
+    if (!playing) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      const dur = edlRef.current.duration;
+      const next = playheadRef.current + dt;
+      if (next >= dur) {
+        setPlayhead(dur);
+        setPlaying(false);
+        return;
+      }
+      setPlayhead(next);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing]);
+
+  // -- render job polling ------------------------------------------------------
+  useEffect(() => {
+    if (!activeJobId || !projectId) return;
+    const iv = setInterval(async () => {
+      try {
+        const j = await api.get<RenderJob>(`/projects/${projectId}/renders/${activeJobId}`);
+        setRenders((rs) => rs.map((r) => (r.id === j.id ? j : r)));
+        if (TERMINAL.has(j.status)) {
+          setActiveJobId(null);
+          setMsg(
+            j.status === "COMPLETED"
+              ? "Render complete — output asset is ready."
+              : `Render ${j.status.toLowerCase()}${j.error ? `: ${j.error.slice(0, 160)}` : ""}`
+          );
+        }
+      } catch {
+        /* keep polling */
+      }
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [activeJobId, projectId]);
+
+  // -- clip ops -----------------------------------------------------------------
+  const selectedClip: { clip: EDLClip; trackType: EDLTrackType } | null = selected
+    ? (() => {
+        const track = edl.tracks.find((t) => t.id === selected.trackId);
+        const clip = track?.clips.find((c) => c.id === selected.clipId);
+        return track && clip ? { clip, trackType: track.type } : null;
+      })()
+    : null;
+
+  const patchSelected = (patch: Partial<EDLClip>) => {
+    if (!selected) return;
+    commit({
+      ...edl,
+      tracks: edl.tracks.map((t) =>
+        t.id === selected.trackId
+          ? { ...t, clips: t.clips.map((c) => (c.id === selected.clipId ? { ...c, ...patch } : c)) }
+          : t
+      ),
     });
   };
 
-  const syncSelection = (t: TimelineV1) => {
-    setSelectedClip((sel) => {
-      if (!sel) return null;
-      for (const track of t.tracks) {
-        const c = track.clips.find((x) => x.id === sel.id);
-        if (c) return c;
-      }
-      return null;
+  const deleteSelected = () => {
+    if (!selected) return;
+    commit({
+      ...edl,
+      tracks: edl.tracks.map((t) =>
+        t.id === selected.trackId
+          ? { ...t, clips: t.clips.filter((c) => c.id !== selected.clipId) }
+          : t
+      ),
     });
+    setSelected(null);
+  };
+
+  const nextFreeStart = (trackId: string): number => {
+    const track = edl.tracks.find((t) => t.id === trackId);
+    if (!track || track.clips.length === 0) return 0;
+    return Math.max(...track.clips.map(clipEnd));
   };
 
   const addClipFromAsset = (asset: Asset) => {
-    const clip: TimelineClip = {
-      id: `clip-${Date.now()}`,
-      track_id: "v1",
-      asset_id: asset.id,
-      start_s: nextFreeStart(timeline, "v1"),
-      end_s: nextFreeStart(timeline, "v1") + (asset.duration_seconds || 5),
-      offset_s: 0,
+    const type: EDLTrackType = asset.asset_type === "AUDIO" ? "audio" : "video";
+    const track = edl.tracks.find((t) => t.type === type) ?? edl.tracks[0];
+    const dur = asset.duration_seconds && asset.duration_seconds > 0 ? asset.duration_seconds : 5;
+    const clip: EDLClip = {
+      id: uid("clip"),
+      source: asset.source_url || asset.object_key,
       label: `${asset.asset_type} ${asset.id.slice(0, 6)}`,
+      start: Math.round(nextFreeStart(track.id) * 100) / 100,
+      in: 0,
+      out: Math.round(Math.min(dur, 60) * 100) / 100,
     };
     commit({
-      ...timeline,
-      tracks: timeline.tracks.map((t) => (t.id === "v1" ? { ...t, clips: [...t.clips, clip] } : t)),
+      ...edl,
+      tracks: edl.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)),
     });
+    setSelected({ trackId: track.id, clipId: clip.id });
   };
 
-  const updateSelectedClip = (patch: Partial<TimelineClip>) => {
-    if (!selectedClip) return;
+  const addTextClip = () => {
+    const track = edl.tracks.find((t) => t.type === "text") ?? edl.tracks[0];
+    const clip: EDLClip = {
+      id: uid("clip"),
+      source: "text",
+      label: "Text overlay",
+      start: Math.round(playheadRef.current * 100) / 100,
+      in: 0,
+      out: 4,
+      textOverlay: { text: "Your text", x: 0.5, y: 0.85, fontSize: 48, color: "#ffffff" },
+    };
     commit({
-      ...timeline,
-      tracks: timeline.tracks.map((t) => ({
-        ...t,
-        clips: t.clips.map((c) => (c.id === selectedClip.id ? { ...c, ...patch } : c)),
-      })),
+      ...edl,
+      tracks: edl.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)),
     });
+    setSelected({ trackId: track.id, clipId: clip.id });
   };
 
+  // -- save / render -------------------------------------------------------------
   const save = async (): Promise<string | null> => {
     if (!projectId) return null;
     setSaving(true);
     setMsg(null);
     try {
-      // Backend TimelineView expects the document under `timeline_json` and
-      // returns the saved TimelineVersion row (its `id` is what renders need).
       const row = await api.post<{ id: string }>(`/projects/${projectId}/timeline`, {
-        timeline_json: timeline,
+        edl: edlRef.current,
       });
       setMsg("Timeline saved.");
       return row.id;
@@ -153,18 +254,18 @@ export default function EditorPage() {
     setRendering(true);
     setMsg(null);
     try {
-      // Render jobs reference a saved TimelineVersion row by its DB id —
-      // save first so the render points at exactly what is on screen.
       const versionId = await save();
       if (!versionId) {
         setMsg("Render aborted: timeline could not be saved.");
         return;
       }
-      const job = await api.post<RenderJob>(`/projects/${projectId}/renders`, {
-        timeline_version_id: versionId,
-      });
+      const job = await api.post<RenderJob>(
+        `/projects/${projectId}/timeline/${versionId}/render`,
+        {}
+      );
       setRenders((r) => [job, ...r]);
-      setMsg(`Render job ${job.id.slice(0, 8)}… submitted.`);
+      setActiveJobId(job.id);
+      setMsg(`Render job ${job.id.slice(0, 8)}… queued.`);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Render failed.");
     } finally {
@@ -173,7 +274,7 @@ export default function EditorPage() {
   };
 
   const exportTimeline = () => {
-    const blob = new Blob([JSON.stringify(timeline, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(edlRef.current, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -183,142 +284,154 @@ export default function EditorPage() {
   };
 
   return (
-    <div className="space-y-3 h-[calc(100vh-9rem)] flex flex-col">
+    <div className="space-y-3 min-h-[calc(100vh-9rem)] flex flex-col">
       {/* top toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)}
-          className="bg-studio-panel2 border border-studio-border rounded-md px-3 py-1.5 text-sm text-studio-text">
+        <select
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          className="bg-studio-panel2 border border-studio-border rounded-md px-3 py-1.5 text-sm text-studio-text"
+        >
           {projects.length === 0 && <option value="">No projects</option>}
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.title}</option>
+          ))}
         </select>
         <div className="flex gap-1">
           <ToolbarBtn onClick={undo} disabled={history.past.length === 0} title="Undo">↶ Undo</ToolbarBtn>
           <ToolbarBtn onClick={redo} disabled={history.future.length === 0} title="Redo">↷ Redo</ToolbarBtn>
         </div>
         <div className="flex gap-1 ml-auto">
-          <ToolbarBtn onClick={save} disabled={saving || !projectId} primary>{saving ? "Saving…" : "Save"}</ToolbarBtn>
-          <ToolbarBtn onClick={render} disabled={rendering || !projectId} primary>{rendering ? "Rendering…" : "Render"}</ToolbarBtn>
+          <ToolbarBtn onClick={save} disabled={saving || !projectId} primary>{saving ? "Saving…" : "Save Timeline"}</ToolbarBtn>
+          <ToolbarBtn onClick={render} disabled={rendering || !projectId} primary>{rendering ? "Queuing…" : "▶ Render"}</ToolbarBtn>
           <ToolbarBtn onClick={exportTimeline} disabled={!projectId}>Export</ToolbarBtn>
         </div>
       </div>
       {msg && <div className="text-sm text-studio-muted">{msg}</div>}
 
-      <div className="flex-1 grid grid-cols-[240px_1fr_240px] gap-3 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_1fr_280px] gap-3">
         {/* left: assets / scenes */}
-        <aside className="bg-studio-panel border border-studio-border rounded-lg overflow-hidden flex flex-col">
+        <aside className="bg-studio-panel border border-studio-border rounded-lg overflow-hidden flex flex-col max-h-[70vh]">
           <div className="flex border-b border-studio-border">
             {(["assets", "scenes"] as const).map((t) => (
-              <button key={t} onClick={() => setLeftTab(t)}
-                className={`flex-1 py-2 text-xs capitalize ${leftTab === t ? "text-accent border-b-2 border-accent" : "text-studio-muted"}`}>
+              <button
+                key={t}
+                onClick={() => setLeftTab(t)}
+                className={`flex-1 py-2 text-xs capitalize ${leftTab === t ? "text-accent border-b-2 border-accent" : "text-studio-muted"}`}
+              >
                 {t}
               </button>
             ))}
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
             {leftTab === "assets" && (
-              assets.length === 0
-                ? <p className="text-xs text-studio-faint p-2">No assets. Generated media will appear here.</p>
-                : assets.map((a) => (
-                    <button key={a.id} onClick={() => addClipFromAsset(a)}
-                      className="w-full text-left bg-studio-panel2 border border-studio-border rounded p-2 hover:border-accent/50">
-                      <div className="text-xs text-studio-text">{a.asset_type}</div>
-                      <div className="text-[11px] text-studio-faint font-mono">{a.id.slice(0, 10)}…</div>
-                      <div className="text-[11px] text-accent mt-1">+ add to timeline</div>
-                    </button>
-                  ))
+              assets.length === 0 ? (
+                <p className="text-xs text-studio-faint p-2">No assets. Generated media will appear here.</p>
+              ) : (
+                assets.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => addClipFromAsset(a)}
+                    className="w-full text-left bg-studio-panel2 border border-studio-border rounded p-2 hover:border-accent/50"
+                  >
+                    <div className="text-xs text-studio-text">{a.asset_type}</div>
+                    <div className="text-[11px] text-studio-faint font-mono truncate">{a.source_url || a.object_key}</div>
+                    <div className="text-[11px] text-accent mt-1">+ add to timeline</div>
+                  </button>
+                ))
+              )
             )}
             {leftTab === "scenes" && (
-              scenes.length === 0
-                ? <p className="text-xs text-studio-faint p-2">No scenes for this project yet.</p>
-                : scenes.map((s) => (
-                    <div key={s.id} className="bg-studio-panel2 border border-studio-border rounded p-2">
-                      <div className="text-xs text-studio-text"><span className="text-accent font-mono mr-1">{String(s.position).padStart(2, "0")}</span>{s.visual_prompt || "(untitled scene)"}</div>
-                      <div className="text-[11px] text-studio-faint mt-0.5">{s.script_segment}</div>
+              scenes.length === 0 ? (
+                <p className="text-xs text-studio-faint p-2">No scenes for this project yet.</p>
+              ) : (
+                scenes.map((s) => (
+                  <div key={s.id} className="bg-studio-panel2 border border-studio-border rounded p-2">
+                    <div className="text-xs text-studio-text">
+                      <span className="text-accent font-mono mr-1">{String(s.position).padStart(2, "0")}</span>
+                      {s.visual_prompt || "(untitled scene)"}
                     </div>
-                  ))
+                    <div className="text-[11px] text-studio-faint mt-0.5 line-clamp-3">{s.script_segment}</div>
+                  </div>
+                ))
+              )
             )}
           </div>
         </aside>
 
         {/* center: preview + timeline */}
-        <div className="flex flex-col gap-3 min-h-0">
-          <div className="bg-studio-panel border border-studio-border rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-studio-muted">Preview</span>
-              <span className="text-[11px] px-2 py-0.5 rounded border border-amber-500/40 text-amber-400 bg-amber-500/10">
-                PREVIEW — not the final render
-              </span>
-            </div>
-            <input value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)}
-              placeholder="Paste a media URL to preview (optional)"
-              className="w-full mb-2 bg-studio-bg border border-studio-border rounded-md px-2 py-1.5 text-xs text-studio-text placeholder:text-studio-faint" />
-            {previewUrl ? (
-              <video src={previewUrl} controls className="w-full max-h-56 bg-black rounded" />
-            ) : (
-              <div className="w-full h-56 bg-black rounded flex items-center justify-center text-studio-faint text-xs">
-                No preview source — paste a URL above
-              </div>
-            )}
+        <div className="flex flex-col gap-3 min-w-0">
+          <PreviewPlayer
+            edl={edl}
+            playhead={playhead}
+            playing={playing}
+            onTogglePlay={() => setPlaying((p) => !p)}
+            onSeek={(t) => {
+              setPlayhead(t);
+            }}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={addTextClip}
+              className="text-xs px-2.5 py-1 rounded-md border border-studio-border text-studio-text hover:border-accent/60"
+            >
+              + Text clip at playhead
+            </button>
+            <span className="text-[11px] text-studio-faint">
+              {edl.tracks.reduce((n, t) => n + t.clips.length, 0)} clips
+            </span>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <TimelineEditor timeline={timeline} onChange={commit} />
-          </div>
+          <VideoEditor
+            edl={edl}
+            onChange={commit}
+            playhead={playhead}
+            onSeek={setPlayhead}
+            selected={selected}
+            onSelect={setSelected}
+          />
         </div>
 
-        {/* right: clip properties */}
-        <aside className="bg-studio-panel border border-studio-border rounded-lg p-3 overflow-y-auto">
-          <h3 className="text-xs font-medium text-studio-text mb-2">Clip properties</h3>
-          {!selectedClip ? (
-            <p className="text-xs text-studio-faint">Click a clip in the timeline to edit it.</p>
-          ) : (
-            <div className="space-y-2 text-xs">
-              <label className="block">
-                <span className="text-studio-faint">Label</span>
-                <input value={selectedClip.label} onChange={(e) => updateSelectedClip({ label: e.target.value })}
-                  className="mt-0.5 w-full bg-studio-bg border border-studio-border rounded px-2 py-1 text-studio-text" />
-              </label>
-              <label className="block">
-                <span className="text-studio-faint">Start (s)</span>
-                <input type="number" step={0.1} min={0} value={selectedClip.start_s}
-                  onChange={(e) => updateSelectedClip({ start_s: Number(e.target.value) })}
-                  className="mt-0.5 w-full bg-studio-bg border border-studio-border rounded px-2 py-1 text-studio-text" />
-              </label>
-              <label className="block">
-                <span className="text-studio-faint">End (s)</span>
-                <input type="number" step={0.1} min={0} value={selectedClip.end_s}
-                  onChange={(e) => updateSelectedClip({ end_s: Number(e.target.value) })}
-                  className="mt-0.5 w-full bg-studio-bg border border-studio-border rounded px-2 py-1 text-studio-text" />
-              </label>
-              <label className="block">
-                <span className="text-studio-faint">Source offset (s)</span>
-                <input type="number" step={0.1} min={0} value={selectedClip.offset_s}
-                  onChange={(e) => updateSelectedClip({ offset_s: Number(e.target.value) })}
-                  className="mt-0.5 w-full bg-studio-bg border border-studio-border rounded px-2 py-1 text-studio-text" />
-              </label>
-              <div className="text-studio-faint">Asset: <span className="font-mono text-studio-text">{selectedClip.asset_id?.slice(0, 12) || "—"}</span></div>
-              <button
-                onClick={() => {
-                  commit({ ...timeline, tracks: timeline.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== selectedClip.id) })) });
-                }}
-                className="text-red-400 hover:underline"
-              >
-                Delete clip
-              </button>
-            </div>
-          )}
-          {renders.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-xs font-medium text-studio-text mb-2">Render jobs</h3>
-              <ul className="space-y-1">
+        {/* right: inspector + render jobs */}
+        <aside className="space-y-3 max-h-[70vh] overflow-y-auto">
+          <Inspector
+            clip={selectedClip?.clip ?? null}
+            trackType={selectedClip?.trackType ?? null}
+            onPatch={patchSelected}
+            onDelete={deleteSelected}
+          />
+          <div className="bg-studio-panel border border-studio-border rounded-lg p-3">
+            <h3 className="text-xs font-medium text-studio-text mb-2">Render jobs</h3>
+            {renders.length === 0 ? (
+              <p className="text-[11px] text-studio-faint">No render jobs yet.</p>
+            ) : (
+              <ul className="space-y-1.5">
                 {renders.map((r) => (
-                  <li key={r.id} className="text-[11px] text-studio-muted font-mono">{r.id.slice(0, 12)}… · {r.status}</li>
+                  <li key={r.id} className="text-[11px] font-mono">
+                    <span className="text-studio-muted">{r.id.slice(0, 12)}…</span>{" "}
+                    <StatusPill status={r.status} />
+                    {r.id === activeJobId && <span className="text-accent ml-1">● live</span>}
+                  </li>
                 ))}
               </ul>
-            </div>
-          )}
+            )}
+          </div>
         </aside>
       </div>
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const color =
+    status === "COMPLETED"
+      ? "text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+      : status === "FAILED"
+        ? "text-red-400 border-red-500/40 bg-red-500/10"
+        : status === "CANCELED"
+          ? "text-studio-faint border-studio-border bg-studio-panel2"
+          : "text-amber-300 border-amber-500/40 bg-amber-500/10";
+  return (
+    <span className={`px-1.5 py-0.5 rounded border text-[10px] ${color}`}>{status}</span>
   );
 }
 
@@ -341,10 +454,4 @@ function ToolbarBtn({
       {children}
     </button>
   );
-}
-
-function nextFreeStart(t: TimelineV1, trackId: string): number {
-  const track = t.tracks.find((x) => x.id === trackId);
-  if (!track || track.clips.length === 0) return 0;
-  return Math.max(...track.clips.map((c) => c.end_s));
 }

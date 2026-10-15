@@ -15,6 +15,8 @@ import tempfile
 
 from django.utils import timezone
 
+from . import edl_to_ffmpeg
+
 TIMELINE_SCHEMA_VERSION = "v1"
 MANIFEST_VERSION = "v1"
 
@@ -428,25 +430,10 @@ class RenderWorker:
         job.started_at = timezone.now()
         job.save(update_fields=["status", "started_at"])
         try:
-            resolved = self.resolve(job)
-            self.normalize(job, resolved)
-            self.render_scene_intermediates(job, plan)
-            self.assemble_video(job, resolved)
-            self.mix_audio(job, resolved)
-            self.add_captions_graphics(job)
-            inputs = [
-                {"path": path, "kind": "video"}
-                for path in resolved["resolved"].values()
-            ]
-            out_path = output_path or f"{self.workdir}/{job.id}.mp4"
-            self.encode(job, inputs, out_path)
-            validation = self.validate_output(job, out_path, resolved)
-            self.make_preview_thumbnail(job, out_path)
-            asset_hashes = {
-                aid: _clip_signature({"key": key})
-                for aid, key in resolved["resolved"].items()
-            }
-            self.store_manifest(job, asset_hashes, validation)
+            if edl_to_ffmpeg.is_edl_document(job.timeline_version.timeline_json):
+                self.run_edl(job, output_path=output_path)
+            else:
+                self._run_legacy(job, plan=plan, output_path=output_path)
             job.status = "COMPLETED"
         except Exception as exc:  # noqa: BLE001 - render supervisor; one job must not kill the batch
             job.status = "FAILED"
@@ -454,6 +441,56 @@ class RenderWorker:
         job.completed_at = timezone.now()
         job.save()
         return job
+
+    def run_edl(self, job, output_path=None):
+        """Render a job whose timeline is an EDL document.
+
+        Builds the FFmpeg command with ``edl_to_ffmpeg``, executes it, then
+        reuses the shared validate / thumbnail / manifest stages.
+        """
+        edl = job.timeline_version.timeline_json
+        out_path = output_path or f"{self.workdir}/{job.id}.mp4"
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        encoding = (job.timeline_version.render_settings or {}).get("encoding", {})
+        cmd = edl_to_ffmpeg.edl_to_ffmpeg(edl, out_path, encoding)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=3600, check=False
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {proc.stderr[-2000:]}")
+        validation = self.validate_output(job, out_path, {})
+        self.make_preview_thumbnail(job, out_path)
+        sources = []
+        for track in edl.get("tracks", []) or []:
+            for clip in track.get("clips", []) or []:
+                if clip.get("source") not in sources:
+                    sources.append(clip.get("source"))
+        asset_hashes = {
+            f"edl-src-{i}": _clip_signature({"source": src})
+            for i, src in enumerate(sources)
+        }
+        self.store_manifest(job, asset_hashes, validation)
+
+    def _run_legacy(self, job, plan=None, output_path=None):
+        """The original 10-stage pipeline for legacy v1 timelines."""
+        resolved = self.resolve(job)
+        self.normalize(job, resolved)
+        self.render_scene_intermediates(job, plan)
+        self.assemble_video(job, resolved)
+        self.mix_audio(job, resolved)
+        self.add_captions_graphics(job)
+        inputs = [
+            {"path": path, "kind": "video"} for path in resolved["resolved"].values()
+        ]
+        out_path = output_path or f"{self.workdir}/{job.id}.mp4"
+        self.encode(job, inputs, out_path)
+        validation = self.validate_output(job, out_path, resolved)
+        self.make_preview_thumbnail(job, out_path)
+        asset_hashes = {
+            aid: _clip_signature({"key": key})
+            for aid, key in resolved["resolved"].items()
+        }
+        self.store_manifest(job, asset_hashes, validation)
 
 
 def manifest_output_key(job):
