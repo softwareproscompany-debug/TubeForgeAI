@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "providers",
     "workflows",
     "publishing",
+    "onboarding",
 ]
 
 MIDDLEWARE = [
@@ -192,6 +193,17 @@ WEBAUTHN_RP_ID = env(
 # Explicit expected origin (e.g. "https://tubeforge.aixentium.com"). When empty,
 # the origin is built from the incoming request's scheme + host.
 WEBAUTHN_ORIGIN = env("WEBAUTHN_ORIGIN", "")
+
+# Resend transactional email (https://resend.com)
+# Unset = dev mode: emails are logged instead of sent.
+RESEND_API_KEY = env("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = env(
+    "RESEND_FROM_EMAIL", "TubeForge <noreply@tubeforge.aixentium.com>"
+)
+FRONTEND_URL = env(
+    "FRONTEND_URL",
+    "http://localhost:3000" if DEBUG else "https://tubeforge.aixentium.com",
+)
 
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
