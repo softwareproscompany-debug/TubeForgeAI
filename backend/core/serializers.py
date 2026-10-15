@@ -1,8 +1,10 @@
 """Core serializers."""
 
+from django.contrib.auth import password_validation
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
-from .models import AuditEvent, Notification, SystemSetting, User
+from .models import AuditEvent, Notification, SystemSetting, User, WebAuthnCredential
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -15,6 +17,52 @@ class UserSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(
+        max_length=150,
+        validators=[UniqueValidator(queryset=User.objects.all())],
+    )
+    email = serializers.EmailField(
+        validators=[UniqueValidator(queryset=User.objects.all())],
+    )
+    password = serializers.CharField(write_only=True)
+
+    def validate_password(self, value):
+        # Run Django's configured password validators against a throwaway user
+        # so validators that need a user (e.g. similarity) still work.
+        user = User(username=self.initial_data.get("username", ""))
+        password_validation.validate_password(value, user=user)
+        return value
+
+    def create(self, validated_data):
+        return User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+        )
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uidb64 = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_new_password(self, value):
+        password_validation.validate_password(value)
+        return value
+
+
+class WebAuthnCredentialSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WebAuthnCredential
+        fields = ("id", "credential_id", "name", "sign_count", "created_at")
+        read_only_fields = fields
 
 
 class AuditEventSerializer(serializers.ModelSerializer):

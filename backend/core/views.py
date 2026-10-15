@@ -1,27 +1,36 @@
 """Core views: auth, health, audit, notifications, system settings."""
 
 import asyncio
+import logging
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.db import connection
 from django.db.utils import DatabaseError
 from django.utils import timezone
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.authtoken.models import Token
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AuditEvent, Notification, SystemSetting
+from .models import AuditEvent, Notification, SystemSetting, User
 from .serializers import (
     AuditEventSerializer,
     LoginSerializer,
     NotificationSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    RegisterSerializer,
     SystemSettingSerializer,
     UserSerializer,
 )
 from .utils import LoginRateThrottle, record_audit
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +142,100 @@ class ChangePasswordView(APIView):
             request=request,
         )
         return Response({"status": "password_changed"})
+
+
+class RegisterView(APIView):
+    """Self-service registration: creates the user and returns an auth token."""
+
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        token, _ = Token.objects.get_or_create(user=user)
+        record_audit(user, "auth.register", "user", str(user.id), request=request)
+        return Response(
+            {"token": token.key, "user": UserSerializer(user).data},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+_password_reset_token_generator = PasswordResetTokenGenerator()
+
+
+class PasswordResetRequestView(APIView):
+    """Start a password reset.
+
+    No email service is wired up yet, so the reset token is logged (stdout)
+    instead of emailed. Always returns 200 so callers cannot probe which
+    email addresses have accounts.
+    """
+
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        user = User.objects.filter(email__iexact=email).first()
+        if user is not None:
+            uidb64 = urlsafe_base64_encode(force_bytes(str(user.pk)))
+            token = _password_reset_token_generator.make_token(user)
+            # TODO: send via email once an email service is configured.
+            logger.info(
+                "Password reset requested for %s: uidb64=%s token=%s",
+                email,
+                uidb64,
+                token,
+            )
+            record_audit(
+                user,
+                "auth.password_reset_request",
+                "user",
+                str(user.id),
+                request=request,
+            )
+        return Response(
+            {
+                "detail": "If an account exists for this email, "
+                "a password reset token has been issued."
+            }
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    """Complete a password reset with the uidb64/token pair from the log/email."""
+
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        user = self._get_user(data["uidb64"])
+        if user is None or not _password_reset_token_generator.check_token(
+            user, data["token"]
+        ):
+            raise ValidationError("Invalid or expired password reset token.")
+        user.set_password(data["new_password"])
+        user.save(update_fields=["password"])
+        record_audit(
+            user,
+            "auth.password_reset_confirm",
+            "user",
+            str(user.id),
+            request=request,
+        )
+        return Response({"status": "password_reset"})
+
+    @staticmethod
+    def _get_user(uidb64):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+        except (ValueError, TypeError):
+            return None
+        return User.objects.filter(pk=uid).first()
 
 
 # ---------------------------------------------------------------------------
