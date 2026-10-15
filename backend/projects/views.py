@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -27,7 +28,7 @@ from core.utils import (
 )
 from providers import gateway as provider_gateway
 
-from . import media_engine
+from . import edl_to_ffmpeg, media_engine
 from .models import Asset, Project, RenderJob, Scene, ScriptVersion, TimelineVersion
 from .serializers import (
     AssetSerializer,
@@ -371,6 +372,41 @@ class SceneViewSet(viewsets.ModelViewSet):
 # ---------------------------------------------------------------------------
 # Timelines (versioned)
 # ---------------------------------------------------------------------------
+def _extract_edl_document(body):
+    """Return the EDL document from a POST body, or None.
+
+    Accepts ``{"edl": {...}}``, a bare EDL document, or
+    ``{"timeline_json": <EDL document>}``.
+    """
+    if not isinstance(body, dict):
+        return None
+    if edl_to_ffmpeg.is_edl_document(body.get("edl")):
+        return body["edl"]
+    if edl_to_ffmpeg.is_edl_document(body):
+        return body
+    if edl_to_ffmpeg.is_edl_document(body.get("timeline_json")):
+        return body["timeline_json"]
+    return None
+
+
+def _create_timeline_version(project, timeline_json, render_settings):
+    """Allocate the next version number with a bounded retry on races."""
+    for _ in range(3):
+        last = project.timeline_versions.aggregate(m=Max("version_number"))["m"] or 0
+        try:
+            return TimelineVersion.objects.create(
+                project=project,
+                version_number=last + 1,
+                timeline_json=timeline_json,
+                render_settings=render_settings or {},
+            )
+        except IntegrityError:
+            continue
+    raise ValidationError(
+        {"detail": "Could not allocate a timeline version; please retry."}
+    )
+
+
 class TimelineView(APIView):
     def get(self, request, project_pk):
         project = _owned_project(request.user, project_pk)
@@ -384,32 +420,28 @@ class TimelineView(APIView):
 
     def post(self, request, project_pk):
         project = _owned_project(request.user, project_pk)
-        timeline_json = request.data.get("timeline_json")
-        try:
-            media_engine.validate_timeline(timeline_json)
-        except media_engine.TimelineValidationError as exc:
-            raise ValidationError({"timeline_json": exc.details})
-        for _ in range(3):
-            last = (
-                project.timeline_versions.aggregate(m=Max("version_number"))["m"] or 0
-            )
+        render_settings = request.data.get("render_settings", {})
+        edl_doc = _extract_edl_document(request.data)
+        if edl_doc is not None:
             try:
-                version = TimelineVersion.objects.create(
-                    project=project,
-                    version_number=last + 1,
-                    timeline_json=timeline_json,
-                    render_settings=request.data.get("render_settings", {}),
-                )
-                break
-            except IntegrityError:
-                continue
+                edl_to_ffmpeg.validate_edl(edl_doc)
+            except edl_to_ffmpeg.EDLValidationError as exc:
+                raise ValidationError({"edl": exc.details})
+            version = _create_timeline_version(project, edl_doc, render_settings)
+            audit_action = "timeline.create_edl"
         else:
-            raise ValidationError(
-                {"detail": "Could not allocate a timeline version; please retry."}
+            timeline_json = request.data.get("timeline_json")
+            try:
+                media_engine.validate_timeline(timeline_json)
+            except media_engine.TimelineValidationError as exc:
+                raise ValidationError({"timeline_json": exc.details})
+            version = _create_timeline_version(
+                project, timeline_json, render_settings
             )
+            audit_action = "timeline.create"
         record_audit(
             request.user,
-            "timeline.create",
+            audit_action,
             "timeline",
             str(version.id),
             request=request,
@@ -417,6 +449,72 @@ class TimelineView(APIView):
         )
         return Response(
             TimelineVersionSerializer(version).data, status=status.HTTP_201_CREATED
+        )
+
+
+class TimelineRenderView(APIView):
+    """Queue a render for an EDL timeline version.
+
+    Validates the stored EDL, builds the FFmpeg command, and creates a QUEUED
+    RenderJob carrying the command in its manifest. The ``render_worker``
+    management command picks QUEUED jobs up and executes the EDL path.
+    """
+
+    def post(self, request, project_pk, version_id):
+        project = _owned_project(request.user, project_pk)
+        version = get_object_or_404(
+            TimelineVersion,
+            pk=parse_uuid(version_id, "version_id"),
+            project=project,
+        )
+        edl_doc = version.timeline_json
+        if not edl_to_ffmpeg.is_edl_document(edl_doc):
+            raise ValidationError(
+                {
+                    "version_id": (
+                        "Timeline version is not an EDL document; "
+                        "use POST /projects/{id}/renders for legacy timelines."
+                    )
+                }
+            )
+        try:
+            edl_to_ffmpeg.validate_edl(edl_doc)
+        except edl_to_ffmpeg.EDLValidationError as exc:
+            raise ValidationError({"edl": exc.details})
+        encoding_settings = request.data.get("encoding_settings", {})
+        if not isinstance(encoding_settings, dict):
+            raise ValidationError(
+                {"encoding_settings": "encoding_settings must be an object."}
+            )
+        job = RenderJob.objects.create(
+            project=project,
+            timeline_version=version,
+            status="QUEUED",
+            manifest={},
+        )
+        command = edl_to_ffmpeg.edl_to_ffmpeg(
+            edl_doc, media_engine.manifest_output_key(job), encoding_settings
+        )
+        job.manifest = {
+            "manifest_version": media_engine.MANIFEST_VERSION,
+            "edl": True,
+            "renderer_version": media_engine._ffmpeg_version(),
+            "timeline_version_id": str(version.id),
+            "ffmpeg_command": command,
+            "encoding_settings": encoding_settings,
+            "created_at": timezone.now().isoformat(),
+        }
+        job.save(update_fields=["manifest"])
+        record_audit(
+            request.user,
+            "timeline.render",
+            "render_job",
+            str(job.id),
+            request=request,
+            metadata={"timeline_version": version.version_number},
+        )
+        return Response(
+            RenderJobSerializer(job).data, status=status.HTTP_201_CREATED
         )
 
 
