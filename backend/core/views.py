@@ -228,13 +228,17 @@ class NotificationDetailView(generics.RetrieveUpdateAPIView):
         return Notification.objects.filter(user=self.request.user)
 
     def perform_update(self, serializer):
-        # PATCH marks the notification read; body fields are immutable.
-        serializer.save(read_at=timezone.now())
+        # PATCH marks the notification read; body fields are immutable, so any
+        # other submitted fields are ignored rather than applied.
+        notification = serializer.instance
+        notification.read_at = timezone.now()
+        notification.save(update_fields=["read_at"])
 
 
 class SystemSettingListView(generics.ListAPIView):
     serializer_class = SystemSettingSerializer
     queryset = SystemSetting.objects.all()
+    permission_classes = (permissions.IsAdminUser,)
 
 
 class SystemSettingDetailView(generics.RetrieveUpdateAPIView):

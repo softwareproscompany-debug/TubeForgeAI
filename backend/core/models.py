@@ -102,5 +102,8 @@ class SystemSetting(UUIDModel):
         related_name="updated_settings",
     )
 
+    class Meta:
+        ordering = ("key",)
+
     def __str__(self):
         return self.key

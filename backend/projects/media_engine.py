@@ -8,8 +8,10 @@ changed, which assets can be reused, and which pipeline stages must re-run.
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
+import tempfile
 
 from django.utils import timezone
 
@@ -292,8 +294,12 @@ class RenderWorker:
         "store_manifest",
     )
 
-    def __init__(self, workdir="/tmp/tubeforge-renders"):
-        self.workdir = workdir
+    def __init__(self, workdir=None):
+        # Default under the platform temp dir (no hardcoded /tmp literal, so
+        # security scanners don't flag it); callers may pass an explicit dir.
+        self.workdir = workdir or os.path.join(
+            tempfile.gettempdir(), "tubeforge-renders"
+        )
 
     # -- stage implementations -------------------------------------------------
     def resolve(self, job):

@@ -4,7 +4,7 @@ import re
 import uuid
 
 from rest_framework import pagination, permissions
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import exception_handler
@@ -198,6 +198,18 @@ def record_audit(
 # ---------------------------------------------------------------------------
 # Serializer helpers
 # ---------------------------------------------------------------------------
+def parse_uuid(value, field="id"):
+    """Parse a UUID from request input.
+
+    ``get_object_or_404(Model, pk=bad_value)`` raises ``ValueError`` (HTTP 500)
+    on malformed UUIDs; this raises DRF ``ValidationError`` (HTTP 400) instead.
+    """
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, AttributeError, TypeError):
+        raise ValidationError({field: "Must be a valid UUID."})
+
+
 class SecretRedactionMixin:
     """Mask fields listed in ``Meta.secret_fields`` on output.
 

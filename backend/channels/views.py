@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from cryptography.fernet import InvalidToken
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
@@ -73,12 +74,18 @@ class ChannelConnectView(APIView):
     """Start YouTube OAuth: create a draft channel row, return the authorization URL."""
 
     def post(self, request):
+        # Validate input through the serializer: raw request.data could carry
+        # over-long strings or non-string types that would 500 on INSERT.
+        input_serializer = ChannelSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
         channel = Channel.objects.create(
             owner=request.user,
-            title=request.data.get("title", "Untitled channel"),
-            description=request.data.get("description", ""),
-            default_language=request.data.get("default_language", "en"),
-            timezone=request.data.get("timezone", "UTC"),
+            title=input_serializer.validated_data.get("title", "Untitled channel"),
+            description=input_serializer.validated_data.get("description", ""),
+            default_language=input_serializer.validated_data.get(
+                "default_language", "en"
+            ),
+            timezone=input_serializer.validated_data.get("timezone", "UTC"),
             youtube_channel_id=None,
             is_active=False,
         )
@@ -184,12 +191,18 @@ class ChannelDisconnectView(APIView):
         channel = _get_owned_channel(request.user, pk)
         credential = getattr(channel, "credential", None)
         if credential is not None:
-            try:
-                raw = bytes(credential.encrypted_refresh_token or b"")
-                if raw:
-                    yt.revoke(decrypt_value(raw))
-            except yt.YouTubeError:
-                pass  # revocation best-effort; local state is still cleared
+            raw = bytes(credential.encrypted_refresh_token or b"")
+            refresh_token = None
+            if raw:
+                try:
+                    refresh_token = decrypt_value(raw)
+                except InvalidToken:
+                    pass  # undecryptable ciphertext; still clear local state below
+            if refresh_token:
+                try:
+                    yt.revoke(refresh_token)
+                except yt.YouTubeError:
+                    pass  # revocation best-effort; local state is still cleared
             credential.encrypted_refresh_token = b""
             credential.revoked_at = timezone.now()
             credential.save(
@@ -218,6 +231,8 @@ class ChannelValidateView(APIView):
             return Response({"valid": False, "reason": "no_active_credential"})
         try:
             tokens = yt.refresh_access_token(decrypt_value(raw))
+        except InvalidToken:
+            return Response({"valid": False, "reason": "credential_undecryptable"})
         except yt.YouTubeError as exc:
             return Response({"valid": False, "reason": str(exc)[:200]})
         credential.expires_at = timezone.now() + timedelta(

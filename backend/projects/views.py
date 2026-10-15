@@ -8,6 +8,7 @@ import uuid
 from urllib.parse import quote
 
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
@@ -16,7 +17,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from channels.models import Channel
-from core.utils import OwnsChannel, record_audit
+from core.utils import (
+    BudgetExceededAPI,
+    OwnsChannel,
+    PaidFallbackApprovalRequiredAPI,
+    parse_uuid,
+    record_audit,
+)
+from providers import gateway as provider_gateway
 
 from . import media_engine
 from .models import Asset, Project, RenderJob, Scene, ScriptVersion, TimelineVersion
@@ -119,10 +127,17 @@ class GeneratePlanView(APIView):
 
     def post(self, request, pk):
         project = _owned_project(request.user, pk)
-        target = int(
-            request.data.get("target_duration_seconds")
-            or project.target_duration_seconds
-        )
+        raw_target = request.data.get("target_duration_seconds")
+        try:
+            target = (
+                int(raw_target)
+                if raw_target is not None
+                else project.target_duration_seconds
+            )
+        except (TypeError, ValueError):
+            raise ValidationError(
+                {"target_duration_seconds": "Must be an integer."}
+            ) from None
         fmt = request.data.get("format") or project.format
         if fmt not in ("LONG_FORM", "SHORT", "DOCUMENTARY", "EXPLAINER", "CINEMATIC"):
             raise ValidationError({"format": "Unsupported format."})
@@ -185,8 +200,20 @@ class ScriptViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         project = self._project()
-        last = project.script_versions.aggregate(m=Max("version_number"))["m"] or 0
-        script = serializer.save(project=project, version_number=last + 1)
+        # Bounded retry: concurrent creates can collide on the unique
+        # (project, version_number) constraint; re-read the max and retry
+        # instead of 500ing on IntegrityError.
+        for _ in range(3):
+            last = project.script_versions.aggregate(m=Max("version_number"))["m"] or 0
+            try:
+                script = serializer.save(project=project, version_number=last + 1)
+                break
+            except IntegrityError:
+                continue
+        else:
+            raise ValidationError(
+                {"detail": "Could not allocate a script version; please retry."}
+            )
         record_audit(
             self.request.user,
             "script.create",
@@ -238,9 +265,23 @@ class SceneViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         project = self._project()
-        last = project.scenes.aggregate(m=Max("position"))["m"]
-        position = serializer.validated_data.get("position", (last or 0) + 1)
-        scene = serializer.save(project=project, position=position)
+        requested = serializer.validated_data.get("position")
+        for _ in range(3):
+            last = project.scenes.aggregate(m=Max("position"))["m"]
+            position = requested if requested is not None else (last or 0) + 1
+            try:
+                scene = serializer.save(project=project, position=position)
+                break
+            except IntegrityError:
+                if requested is not None:
+                    raise ValidationError(
+                        {"position": "A scene already exists at this position."}
+                    ) from None
+                continue
+        else:
+            raise ValidationError(
+                {"detail": "Could not allocate a scene position; please retry."}
+            )
         record_audit(
             self.request.user,
             "scene.create",
@@ -251,7 +292,7 @@ class SceneViewSet(viewsets.ModelViewSet):
 
     def generate(self, request, project_pk=None, pk=None):
         """Create a GenerationJob for this scene via the provider gateway."""
-        from providers.gateway import route_generation
+        from providers.models import GenerationJob
         from providers.serializers import GenerationJobSerializer
 
         scene = self.get_object()
@@ -259,20 +300,38 @@ class SceneViewSet(viewsets.ModelViewSet):
         task_type = (
             "video" if scene.scene_type in ("CINEMATIC", "FACELESS") else "image"
         )
-        job = route_generation(
-            task_type=task_type,
-            requirements=scene.generation_settings
-            or {"duration_seconds": scene.duration_seconds},
-            channel=project.channel,
-            project=project,
-            scene=scene,
-            idempotency_key=request.data.get("idempotency_key") or uuid.uuid4().hex,
-            allow_paid_fallback=bool(request.data.get("allow_paid_fallback", False)),
-            requested_model_id=request.data.get("model_id"),
-            request_metadata={"scene_id": str(scene.id)},
-        )
-        scene.status = "GENERATING"
-        scene.save(update_fields=["status", "updated_at"])
+        idempotency_key = request.data.get("idempotency_key") or uuid.uuid4().hex
+        # Idempotent submit, scoped to this project: a duplicate key returns the
+        # existing job (HTTP 200), never a second job or another user's job.
+        existing = GenerationJob.objects.filter(
+            idempotency_key=idempotency_key, project=project
+        ).first()
+        if existing is not None:
+            return Response(GenerationJobSerializer(existing).data)
+        try:
+            job = provider_gateway.route_generation(
+                task_type=task_type,
+                requirements=scene.generation_settings
+                or {"duration_seconds": scene.duration_seconds},
+                channel=project.channel,
+                project=project,
+                scene=scene,
+                idempotency_key=idempotency_key,
+                allow_paid_fallback=bool(
+                    request.data.get("allow_paid_fallback", False)
+                ),
+                requested_model_id=request.data.get("model_id"),
+                request_metadata={"scene_id": str(scene.id)},
+            )
+        except provider_gateway.BudgetExceeded as exc:
+            raise BudgetExceededAPI(f"{exc.code}: {exc}") from exc
+        except provider_gateway.PaidFallbackApprovalRequired as exc:
+            raise PaidFallbackApprovalRequiredAPI(f"{exc.code}: {exc}") from exc
+        except provider_gateway.ProviderError as exc:
+            raise ValidationError({"detail": f"{exc.code}: {exc}"}) from exc
+        if job.status == "RUNNING":
+            scene.status = "GENERATING"
+            scene.save(update_fields=["status", "updated_at"])
         record_audit(
             request.user,
             "scene.generate",
@@ -327,13 +386,24 @@ class TimelineView(APIView):
             media_engine.validate_timeline(timeline_json)
         except media_engine.TimelineValidationError as exc:
             raise ValidationError({"timeline_json": exc.details})
-        last = project.timeline_versions.aggregate(m=Max("version_number"))["m"] or 0
-        version = TimelineVersion.objects.create(
-            project=project,
-            version_number=last + 1,
-            timeline_json=timeline_json,
-            render_settings=request.data.get("render_settings", {}),
-        )
+        for _ in range(3):
+            last = (
+                project.timeline_versions.aggregate(m=Max("version_number"))["m"] or 0
+            )
+            try:
+                version = TimelineVersion.objects.create(
+                    project=project,
+                    version_number=last + 1,
+                    timeline_json=timeline_json,
+                    render_settings=request.data.get("render_settings", {}),
+                )
+                break
+            except IntegrityError:
+                continue
+        else:
+            raise ValidationError(
+                {"detail": "Could not allocate a timeline version; please retry."}
+            )
         record_audit(
             request.user,
             "timeline.create",
@@ -366,12 +436,21 @@ class RenderJobViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         project = self._project()
         timeline_version = get_object_or_404(
-            TimelineVersion, pk=request.data.get("timeline_version_id"), project=project
+            TimelineVersion,
+            pk=parse_uuid(
+                request.data.get("timeline_version_id"), "timeline_version_id"
+            ),
+            project=project,
         )
         try:
             media_engine.validate_timeline(timeline_version.timeline_json)
         except media_engine.TimelineValidationError as exc:
             raise ValidationError({"timeline_version_id": exc.details})
+        encoding_settings = request.data.get("encoding_settings", {})
+        if not isinstance(encoding_settings, dict):
+            raise ValidationError(
+                {"encoding_settings": "encoding_settings must be an object."}
+            )
         asset_hashes = {
             str(a.id): (a.sha256 or a.object_key)
             for a in project.assets.filter(status="READY")
@@ -379,7 +458,7 @@ class RenderJobViewSet(viewsets.ModelViewSet):
         manifest = media_engine.build_render_manifest(
             asset_hashes,
             timeline_version.id,
-            request.data.get("encoding_settings", {}),
+            encoding_settings,
             {"timeline_valid": True},
         )
         job = RenderJob.objects.create(
@@ -467,7 +546,10 @@ class UploadUrlView(APIView):
     def post(self, request):
         filename = (request.data.get("filename") or "").strip().lstrip("/")
         mime_type = request.data.get("mime_type", "")
-        size_bytes = int(request.data.get("size_bytes") or 0)
+        try:
+            size_bytes = int(request.data.get("size_bytes") or 0)
+        except (TypeError, ValueError):
+            raise ValidationError({"size_bytes": "Must be an integer."}) from None
         if not filename:
             raise ValidationError({"filename": "Filename is required."})
         if mime_type not in ALLOWED_UPLOAD_MIMES:
@@ -477,7 +559,11 @@ class UploadUrlView(APIView):
                 {"size_bytes": f"Must be between 1 and {MAX_UPLOAD_BYTES}."}
             )
         project_id = request.data.get("project_id")
-        project = _owned_project(request.user, project_id) if project_id else None
+        project = (
+            _owned_project(request.user, parse_uuid(project_id, "project_id"))
+            if project_id
+            else None
+        )
         safe_name = "".join(
             c for c in filename if c.isalnum() or c in ("-", "_", ".", "/")
         )[:200]

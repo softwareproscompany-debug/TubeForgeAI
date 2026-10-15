@@ -24,7 +24,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "created_at", "updated_at")
+        # ``channel`` is set at creation from the owned channel in the URL/body
+        # lookup; it must not be rewritable to another owner's channel later.
+        read_only_fields = ("id", "channel", "created_at", "updated_at")
 
 
 class ScriptVersionSerializer(serializers.ModelSerializer):
@@ -40,7 +42,10 @@ class ScriptVersionSerializer(serializers.ModelSerializer):
             "approval_status",
             "created_at",
         )
-        read_only_fields = ("id", "created_at")
+        # ``project`` and ``version_number`` are server-allocated on create;
+        # accepting them on input would allow moving versions between projects
+        # or colliding with the unique (project, version_number) constraint.
+        read_only_fields = ("id", "project", "version_number", "created_at")
 
 
 class SceneSerializer(serializers.ModelSerializer):

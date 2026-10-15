@@ -1,0 +1,7 @@
+# TubeForge AI — backend .dockerignore (builds with context backend/).
+__pycache__
+.pytest_cache
+.ruff_cache
+.mypy_cache
+tests
+*.pyc
