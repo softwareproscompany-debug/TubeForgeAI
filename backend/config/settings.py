@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     "workflows",
     "publishing",
     "onboarding",
+    "swarm",
 ]
 
 MIDDLEWARE = [
