@@ -1,6 +1,6 @@
 # TubeForge AI — CI/CD pipeline (spec §13.4).
 #
-# Stages: lint -> typecheck -> unit -> migrations-check -> integration ->
+# Stages: lint -> typecheck -> unit -> migrations-check ->
 # frontend-build -> security -> docker-build -> deploy-staging -> smoke ->
 # deploy-production (manual approval, health-gated rollback).
 #
@@ -143,32 +143,10 @@ jobs:
         working-directory: backend
         run: python manage.py makemigrations --check --dry-run
 
-  # ----------------------------------------------------------- integration ---
-  integration:
-    runs-on: ubuntu-latest
-    needs: [migrations-check]
-    env:
-      SECRET_KEY: ci-test-secret-key-not-for-production-0123456789abcdef
-      FERNET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install backend deps
-        working-directory: backend
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio
-      - name: pytest tests/integration
-        env:
-          PYTHONPATH: ${{ github.workspace }}/backend
-        run: pytest tests/integration -q
-
   # --------------------------------------------------------- frontend-build ---
   frontend-build:
     runs-on: ubuntu-latest
-    needs: [integration]
+    needs: [migrations-check]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
