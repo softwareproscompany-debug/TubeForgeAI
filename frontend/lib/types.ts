@@ -255,12 +255,14 @@ export interface Asset {
   project: string | null;
   scene: string | null;
   asset_type: string;
+  object_key: string;
   mime_type: string;
   sha256: string;
   duration_seconds: number | null;
   width: number | null;
   height: number | null;
   source_type: string;
+  source_url: string | null;
   license_metadata: Record<string, unknown> | null;
   model_metadata: Record<string, unknown> | null;
   status: string;
@@ -442,4 +444,49 @@ export interface ChannelConnectResponse {
   channel_id: string;
   authorization_url: string;
   state: string;
+}
+
+// ── Agent swarm ──────────────────────────────────────────────
+export interface SwarmAgentRef {
+  id: string;
+  name: string;
+  role: string;
+  model: string;
+  status: string;
+}
+
+export interface SwarmAgentState {
+  role: string;
+  state: "idle" | "working" | "done";
+}
+
+export type SwarmRunStatus = "running" | "completed" | "failed" | "cancelled";
+
+export interface SwarmRun {
+  id: string;
+  project: string;
+  project_title: string;
+  topic: string;
+  status: SwarmRunStatus;
+  current_stage: string;
+  error: string;
+  started_at: string;
+  completed_at: string | null;
+  agents: SwarmAgentState[];
+}
+
+export type AgentMessageType =
+  | "task"
+  | "result"
+  | "question"
+  | "answer"
+  | "revision_request";
+
+export interface AgentMessage {
+  id: string;
+  from_agent: SwarmAgentRef | null;
+  to_agent: SwarmAgentRef | null;
+  message_type: AgentMessageType;
+  content: Record<string, unknown>;
+  created_at: string;
 }

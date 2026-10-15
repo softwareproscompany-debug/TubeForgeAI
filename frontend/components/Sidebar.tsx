@@ -47,6 +47,9 @@ const ICONS: Record<string, JSX.Element> = {
   health: (
     <path d="M12 21s-7-4.6-9.5-9A5.5 5.5 0 0112 6a5.5 5.5 0 019.5 6c-2.5 4.4-9.5 9-9.5 9z" strokeLinejoin="round" />
   ),
+  swarm: (
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.8 2.8M16.2 16.2L19 19M19 5l-2.8 2.8M7.8 16.2L5 19" strokeLinecap="round" />
+  ),
   settings: (
     <path d="M4 8h16M4 16h16M8 4v6M16 12v6" strokeLinecap="round" />
   ),
@@ -66,6 +69,7 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/analytics", label: "Analytics", icon: "analytics" },
   { href: "/models", label: "AI Models & Providers", icon: "models" },
   { href: "/automation", label: "Automation Workflows", icon: "automation" },
+  { href: "/swarm", label: "Agent Swarm", icon: "swarm" },
   { href: "/health", label: "System Health", icon: "health" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];

@@ -11,6 +11,7 @@ from .views import (
     RenderJobViewSet,
     SceneViewSet,
     ScriptViewSet,
+    TimelineRenderView,
     TimelineView,
     UploadUrlView,
 )
@@ -78,6 +79,11 @@ urlpatterns = [
         "projects/<uuid:project_pk>/timeline",
         TimelineView.as_view(),
         name="project-timeline",
+    ),
+    path(
+        "projects/<uuid:project_pk>/timeline/<uuid:version_id>/render",
+        TimelineRenderView.as_view(),
+        name="project-timeline-render",
     ),
     path("projects/<uuid:project_pk>/renders", render_list, name="render-list"),
     path(
