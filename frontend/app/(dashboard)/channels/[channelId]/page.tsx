@@ -46,15 +46,15 @@ export default function ChannelDetailPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-studio-text">{channel.title}</h1>
-          <div className="text-xs text-studio-faint font-mono mt-1">{channel.youtube_channel_id}</div>
+          <div className="text-xs text-studio-faint font-mono mt-1 break-all">{channel.youtube_channel_id}</div>
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={channel.is_active ? "HEALTHY" : "PAUSED"} />
           {channel.is_active && (
-            <button onClick={disconnect} className="text-xs text-red-400 hover:underline">Disconnect</button>
+            <button onClick={disconnect} className="text-xs text-red-400 hover:underline min-h-[44px] inline-flex items-center">Disconnect</button>
           )}
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function ChannelDetailPage() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm whitespace-nowrap border-b-2 -mb-px ${
+            className={`px-4 py-2 min-h-[44px] text-sm whitespace-nowrap border-b-2 -mb-px ${
               tab === t ? "border-accent text-accent" : "border-transparent text-studio-muted hover:text-studio-text"
             }`}
           >
@@ -136,12 +136,12 @@ function ContentTab({ channelId }: { channelId: string }) {
         ) : (
           <ul className="space-y-2">
             {ideas.map((i) => (
-              <li key={i.id} className="bg-studio-panel border border-studio-border rounded-lg p-3 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm text-studio-text font-medium">{i.title}</div>
+              <li key={i.id} className="bg-studio-panel border border-studio-border rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm text-studio-text font-medium break-words">{i.title}</div>
                   <div className="text-xs text-studio-faint">{i.topic} · {i.format} · confidence {(i.confidence_score * 100).toFixed(0)}%</div>
                 </div>
-                <button onClick={() => createProject(i.id)} className="text-xs text-accent hover:underline shrink-0">
+                <button onClick={() => createProject(i.id)} className="text-xs text-accent hover:underline shrink-0 min-h-[44px] inline-flex items-center">
                   Create project
                 </button>
               </li>
@@ -156,8 +156,8 @@ function ContentTab({ channelId }: { channelId: string }) {
         ) : (
           <ul className="space-y-2">
             {projects.map((p) => (
-              <li key={p.id} className="bg-studio-panel border border-studio-border rounded-lg p-3 flex items-center justify-between gap-3">
-                <a href={`/projects/${p.id}`} className="text-sm text-studio-text hover:text-accent">{p.title}</a>
+              <li key={p.id} className="bg-studio-panel border border-studio-border rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
+                <a href={`/projects/${p.id}`} className="text-sm text-studio-text hover:text-accent min-h-[44px] inline-flex items-center break-words min-w-0">{p.title}</a>
                 <StatusBadge status={p.status} />
               </li>
             ))}
@@ -184,8 +184,8 @@ function ChannelCalendarTab({ channelId }: { channelId: string }) {
         <ul className="space-y-2">
           {pubs.sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime()).map((p) => (
             <li key={p.id} className="text-sm flex justify-between gap-3">
-              <span className="text-studio-text">{p.title}</span>
-              <span className="text-studio-faint">{fmtDate(p.scheduled_at)}</span>
+              <span className="text-studio-text min-w-0 truncate">{p.title}</span>
+              <span className="text-studio-faint shrink-0">{fmtDate(p.scheduled_at)}</span>
             </li>
           ))}
         </ul>
@@ -249,7 +249,7 @@ function BrandingTab({ channel }: { channel: Channel }) {
         spellCheck={false}
         className="w-full bg-studio-bg border border-studio-border rounded-md p-3 font-mono text-xs text-studio-text"
       />
-      <button onClick={save} className="text-sm bg-accent text-black font-medium px-4 py-1.5 rounded-md">Save branding</button>
+      <button onClick={save} className="text-sm bg-accent text-black font-medium px-4 py-1.5 min-h-[44px] rounded-md">Save branding</button>
       {msg && <div className="text-sm text-studio-muted">{msg}</div>}
     </div>
   );
@@ -308,7 +308,7 @@ function PublishingSettingsTab({ channel }: { channel: Channel }) {
         spellCheck={false}
         className="w-full bg-studio-bg border border-studio-border rounded-md p-3 font-mono text-xs text-studio-text"
       />
-      <button onClick={save} className="text-sm bg-accent text-black font-medium px-4 py-1.5 rounded-md">Save policy</button>
+      <button onClick={save} className="text-sm bg-accent text-black font-medium px-4 py-1.5 min-h-[44px] rounded-md">Save policy</button>
       {msg && <div className="text-sm text-studio-muted">{msg}</div>}
     </div>
   );

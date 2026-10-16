@@ -206,7 +206,7 @@ function OnboardingWizard() {
 
   if (loading || !progress) {
     return (
-      <AuthCard title="Setting up your studio…">
+      <AuthCard title="Setting up your studio…" className="max-w-lg">
         <p className="text-sm text-studio-muted">Loading onboarding…</p>
         {error && <FormError message={error} />}
       </AuthCard>
@@ -220,6 +220,7 @@ function OnboardingWizard() {
     <AuthCard
       title="Set up TubeForge"
       subtitle={`Step ${idx + 1} of ${STEPS.length}: ${step.label}`}
+      className="max-w-lg"
     >
       {/* Progress bar */}
       <div className="flex gap-1.5 mb-1">
@@ -261,7 +262,7 @@ function OnboardingWizard() {
           <button
             onClick={() => completeStep("welcome")}
             disabled={busy}
-            className="w-full rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50"
+            className="w-full min-h-[48px] rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50 touch-manipulation"
           >
             {busy ? "Saving…" : "Let's go →"}
           </button>
@@ -283,7 +284,7 @@ function OnboardingWizard() {
           <button
             onClick={startYouTubeConnect}
             disabled={connecting}
-            className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+            className="w-full min-h-[48px] rounded-lg bg-red-600 py-3 text-base font-medium text-white hover:bg-red-500 disabled:opacity-50 touch-manipulation"
           >
             {connecting ? "Opening Google…" : "▶ Connect with YouTube"}
           </button>
@@ -319,7 +320,7 @@ function OnboardingWizard() {
                 <select
                   value={niche}
                   onChange={(e) => setNiche(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm text-studio-text"
+                  className="mt-1 w-full min-h-[48px] rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-base text-studio-text touch-manipulation"
                 >
                   <option value="">Select a niche…</option>
                   {NICHES.map((n) => (
@@ -332,7 +333,7 @@ function OnboardingWizard() {
                 <select
                   value={schedule}
                   onChange={(e) => setSchedule(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm text-studio-text"
+                  className="mt-1 w-full min-h-[48px] rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-base text-studio-text touch-manipulation"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -355,7 +356,7 @@ function OnboardingWizard() {
               <button
                 onClick={saveChannelSetup}
                 disabled={busy}
-                className="w-full rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50"
+                className="w-full min-h-[48px] rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50 touch-manipulation"
               >
                 {busy ? "Saving…" : "Save & continue →"}
               </button>
@@ -383,7 +384,7 @@ function OnboardingWizard() {
             <select
               value={projectFormat}
               onChange={(e) => setProjectFormat(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm text-studio-text"
+              className="mt-1 w-full min-h-[48px] rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-base text-studio-text touch-manipulation"
             >
               <option value="tutorial">Tutorial / How-to</option>
               <option value="listicle">Listicle / Top 10</option>
@@ -399,13 +400,13 @@ function OnboardingWizard() {
               onChange={(e) => setProjectIdea(e.target.value)}
               rows={3}
               placeholder="What should this video be about?"
-              className="mt-1 w-full rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm text-studio-text"
+              className="mt-1 w-full rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-base text-studio-text"
             />
           </div>
           <button
             onClick={createFirstProject}
             disabled={busy}
-            className="w-full rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50"
+            className="w-full min-h-[48px] rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50 touch-manipulation"
           >
             {busy ? "Creating…" : "🚀 Create my first project"}
           </button>
@@ -418,7 +419,7 @@ function OnboardingWizard() {
             onClick={() =>
               setProgress({ ...progress, current_step: STEPS[idx - 1].id })
             }
-            className="text-xs text-studio-muted underline hover:text-studio-text"
+            className="text-xs text-studio-muted underline hover:text-studio-text touch-manipulation py-2 px-1"
           >
             ← Back
           </button>
@@ -429,7 +430,7 @@ function OnboardingWizard() {
           <button
             onClick={skipAll}
             disabled={busy}
-            className="text-xs text-studio-faint underline hover:text-studio-muted"
+            className="text-xs text-studio-faint underline hover:text-studio-muted touch-manipulation py-2 px-1"
           >
             Skip setup for now
           </button>

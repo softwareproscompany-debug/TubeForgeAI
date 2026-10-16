@@ -290,18 +290,18 @@ export default function EditorPage() {
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="bg-studio-panel2 border border-studio-border rounded-md px-3 py-1.5 text-sm text-studio-text"
+          className="w-full sm:w-auto min-h-[44px] text-base bg-studio-panel2 border border-studio-border rounded-md px-3 py-1.5 text-studio-text touch-manipulation"
         >
           {projects.length === 0 && <option value="">No projects</option>}
           {projects.map((p) => (
             <option key={p.id} value={p.id}>{p.title}</option>
           ))}
         </select>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1 w-full sm:w-auto">
           <ToolbarBtn onClick={undo} disabled={history.past.length === 0} title="Undo">↶ Undo</ToolbarBtn>
           <ToolbarBtn onClick={redo} disabled={history.future.length === 0} title="Redo">↷ Redo</ToolbarBtn>
         </div>
-        <div className="flex gap-1 ml-auto">
+        <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:ml-auto">
           <ToolbarBtn onClick={save} disabled={saving || !projectId} primary>{saving ? "Saving…" : "Save Timeline"}</ToolbarBtn>
           <ToolbarBtn onClick={render} disabled={rendering || !projectId} primary>{rendering ? "Queuing…" : "▶ Render"}</ToolbarBtn>
           <ToolbarBtn onClick={exportTimeline} disabled={!projectId}>Export</ToolbarBtn>
@@ -311,13 +311,13 @@ export default function EditorPage() {
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_1fr_280px] gap-3">
         {/* left: assets / scenes */}
-        <aside className="bg-studio-panel border border-studio-border rounded-lg overflow-hidden flex flex-col max-h-[70vh]">
+        <aside className="bg-studio-panel border border-studio-border rounded-lg overflow-hidden flex flex-col min-w-0 max-h-[45vh] lg:max-h-[70vh]">
           <div className="flex border-b border-studio-border">
             {(["assets", "scenes"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setLeftTab(t)}
-                className={`flex-1 py-2 text-xs capitalize ${leftTab === t ? "text-accent border-b-2 border-accent" : "text-studio-muted"}`}
+                className={`flex-1 min-h-[44px] py-2 text-xs capitalize touch-manipulation ${leftTab === t ? "text-accent border-b-2 border-accent" : "text-studio-muted"}`}
               >
                 {t}
               </button>
@@ -332,7 +332,7 @@ export default function EditorPage() {
                   <button
                     key={a.id}
                     onClick={() => addClipFromAsset(a)}
-                    className="w-full text-left bg-studio-panel2 border border-studio-border rounded p-2 hover:border-accent/50"
+                    className="w-full min-h-[44px] text-left bg-studio-panel2 border border-studio-border rounded p-2 hover:border-accent/50 touch-manipulation"
                   >
                     <div className="text-xs text-studio-text">{a.asset_type}</div>
                     <div className="text-[11px] text-studio-faint font-mono truncate">{a.source_url || a.object_key}</div>
@@ -373,7 +373,7 @@ export default function EditorPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={addTextClip}
-              className="text-xs px-2.5 py-1 rounded-md border border-studio-border text-studio-text hover:border-accent/60"
+              className="min-h-[44px] text-xs px-3 py-1 rounded-md border border-studio-border text-studio-text hover:border-accent/60 touch-manipulation"
             >
               + Text clip at playhead
             </button>
@@ -392,7 +392,7 @@ export default function EditorPage() {
         </div>
 
         {/* right: inspector + render jobs */}
-        <aside className="space-y-3 max-h-[70vh] overflow-y-auto">
+        <aside className="space-y-3 min-w-0 lg:max-h-[70vh] lg:overflow-y-auto">
           <Inspector
             clip={selectedClip?.clip ?? null}
             trackType={selectedClip?.trackType ?? null}
@@ -445,7 +445,7 @@ function ToolbarBtn({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`text-sm px-3 py-1.5 rounded-md border disabled:opacity-40 ${
+      className={`w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center text-sm px-3 py-1.5 rounded-md border disabled:opacity-40 touch-manipulation ${
         primary
           ? "bg-accent text-black font-medium border-accent hover:brightness-110"
           : "border-studio-border text-studio-text hover:border-accent/60"

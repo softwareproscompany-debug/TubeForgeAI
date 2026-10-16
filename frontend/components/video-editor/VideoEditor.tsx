@@ -275,7 +275,7 @@ export default function VideoEditor({
       <div ref={scrollRef} className="overflow-x-auto">
         <div style={{ minWidth: width + 220 }}>
           {/* ruler */}
-          <div className="flex ml-40">
+          <div className="flex ml-28 sm:ml-40">
             <div
               className="relative h-7 border-b border-studio-border cursor-pointer flex-1"
               style={{ width }}
@@ -305,7 +305,7 @@ export default function VideoEditor({
             const st = styleFor[track.type] ?? styleFor.video;
             return (
               <div key={track.id} className="flex border-b border-studio-border/60 last:border-b-0">
-                <div className="w-40 shrink-0 px-3 py-2 bg-studio-panel flex flex-col justify-center">
+                <div className="w-28 sm:w-40 shrink-0 px-3 py-2 bg-studio-panel flex flex-col justify-center">
                   <div className="text-xs text-studio-text font-medium truncate">
                     {track.name || track.id}
                   </div>
@@ -375,7 +375,7 @@ function ToolBtn({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="text-xs px-2.5 py-1 rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-40"
+      className="min-h-[44px] inline-flex items-center justify-center text-xs px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-40 touch-manipulation"
     >
       {children}
     </button>
@@ -419,25 +419,25 @@ function ClipBlock({
       style={{ left: clip.start * pxPerSec, width: Math.max(20, dur * pxPerSec) }}
       title={`${label}\n${fmtTime(clip.start)} → ${fmtTime(clipEnd(clip))} (src ${clip.in}s–${clip.out}s)`}
     >
-      {/* trim handles */}
+      {/* trim handles — 24px invisible hit zones for touch */}
       <div
         onPointerDown={onTrimLeft}
-        className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-accent/40 rounded-l-md touch-none"
+        className="absolute left-0 top-0 bottom-0 w-6 cursor-ew-resize hover:bg-accent/40 rounded-l-md touch-none"
         title="Drag to trim head"
       />
       <div
         onPointerDown={onTrimRight}
-        className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-accent/40 rounded-r-md touch-none"
+        className="absolute right-0 top-0 bottom-0 w-6 cursor-ew-resize hover:bg-accent/40 rounded-r-md touch-none"
         title="Drag to trim tail"
       />
       {showTrans(transIn) && (
-        <span className="absolute left-2.5 top-1 text-[9px] text-amber-300" title={`Transition in: ${transIn}`}>
+        <span className="absolute left-2.5 top-1 text-[9px] text-amber-300 pointer-events-none" title={`Transition in: ${transIn}`}>
           ◀
         </span>
       )}
       <span className="text-studio-text truncate mx-3 pointer-events-none">{label}</span>
       {showTrans(transOut) && (
-        <span className="absolute right-2.5 top-1 text-[9px] text-amber-300" title={`Transition out: ${transOut}`}>
+        <span className="absolute right-2.5 top-1 text-[9px] text-amber-300 pointer-events-none" title={`Transition out: ${transOut}`}>
           ▶
         </span>
       )}

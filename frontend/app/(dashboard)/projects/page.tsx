@@ -121,11 +121,11 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-studio-text">Projects</h1>
         <button
           onClick={() => { setWizardOpen(true); setStep(0); setWizardError(null); }}
-          className="bg-accent text-black font-medium text-sm px-4 py-2 rounded-md hover:brightness-110"
+          className="bg-accent text-black font-medium text-sm px-4 py-2 min-h-[44px] rounded-md hover:brightness-110"
         >
           + New project
         </button>
@@ -158,12 +158,12 @@ export default function ProjectsPage() {
       </div>
 
       {wizardOpen && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-40 p-4">
           <div className="absolute inset-0 bg-black/70" onClick={() => setWizardOpen(false)} />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-studio-panel border border-studio-border rounded-lg p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-studio-text">New project — step {step + 1} of 7: {STEPS[step]}</h2>
-              <button onClick={() => setWizardOpen(false)} className="text-studio-muted hover:text-studio-text text-xl" aria-label="Close">×</button>
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl bg-studio-panel border border-studio-border rounded-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="font-semibold text-studio-text text-sm sm:text-base">New project — step {step + 1} of 7: {STEPS[step]}</h2>
+              <button onClick={() => setWizardOpen(false)} className="text-studio-muted hover:text-studio-text text-xl min-h-[44px] min-w-[44px] shrink-0" aria-label="Close">×</button>
             </div>
             <div className="flex gap-1 mb-5">
               {STEPS.map((s, i) => (
@@ -194,7 +194,7 @@ export default function ProjectsPage() {
                     <input value={draft.title} onChange={(e) => set("title", e.target.value)}
                       className="mt-1 w-full bg-studio-bg border border-studio-border rounded-md px-3 py-2 text-studio-text" />
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="block text-sm">
                       <span className="text-studio-muted">Format</span>
                       <select value={draft.format} onChange={(e) => set("format", e.target.value)}
@@ -272,19 +272,19 @@ export default function ProjectsPage() {
 
             {wizardError && <div className="text-sm text-red-400 mt-3">{wizardError}</div>}
 
-            <div className="flex justify-between mt-6">
+            <div className="flex justify-between gap-2 mt-6">
               <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}
-                className="text-sm px-4 py-2 rounded-md border border-studio-border text-studio-text disabled:opacity-40">
+                className="text-sm px-4 py-2 min-h-[44px] rounded-md border border-studio-border text-studio-text disabled:opacity-40">
                 Back
               </button>
               {step < 6 ? (
                 <button onClick={() => setStep((s) => s + 1)} disabled={!canNext()}
-                  className="text-sm bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+                  className="text-sm bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
                   Continue
                 </button>
               ) : (
                 <button onClick={create} disabled={creating || !canNext()}
-                  className="text-sm bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+                  className="text-sm bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
                   {creating ? "Creating…" : "Create project"}
                 </button>
               )}
