@@ -96,13 +96,13 @@ export default function AutomationPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-semibold text-studio-text">Automation Workflows</h1>
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-wrap gap-3 items-center">
           <select value={channelId} onChange={(e) => setChannelId(e.target.value)}
-            className="bg-studio-panel2 border border-studio-border rounded-md px-3 py-2 text-sm text-studio-text">
+            className="bg-studio-panel2 border border-studio-border rounded-md px-3 py-2 min-h-[44px] text-sm text-studio-text">
             {channels.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
           <button onClick={openNew} disabled={!channelId}
-            className="bg-accent text-black font-medium text-sm px-4 py-2 rounded-md hover:brightness-110 disabled:opacity-50">
+            className="bg-accent text-black font-medium text-sm px-4 py-2 min-h-[44px] rounded-md hover:brightness-110 disabled:opacity-50">
             + New rule
           </button>
         </div>
@@ -124,15 +124,15 @@ export default function AutomationPage() {
         )}
         {rules.map((r) => (
           <div key={r.id} className="bg-studio-panel border border-studio-border rounded-lg p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <div className="text-studio-text font-medium">{r.name}</div>
-                <div className="text-xs text-studio-faint mt-0.5">trigger: <span className="font-mono">{r.trigger_type}</span></div>
+                <div className="text-xs text-studio-faint mt-0.5">trigger: <span className="font-mono break-all">{r.trigger_type}</span></div>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={r.enabled ? "HEALTHY" : "PAUSED"} />
-                <button onClick={() => openEdit(r)} className="text-xs text-accent hover:underline">Edit</button>
-                <button onClick={() => toggle(r)} className="text-xs text-studio-muted hover:text-studio-text">
+                <button onClick={() => openEdit(r)} className="text-xs text-accent hover:underline min-h-[44px] inline-flex items-center">Edit</button>
+                <button onClick={() => toggle(r)} className="text-xs text-studio-muted hover:text-studio-text min-h-[44px] inline-flex items-center">
                   {r.enabled ? "Disable" : "Enable"}
                 </button>
               </div>
@@ -152,9 +152,9 @@ export default function AutomationPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-40 p-4">
           <div className="absolute inset-0 bg-black/70" onClick={() => setShowForm(false)} />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-studio-panel border border-studio-border rounded-lg p-6 max-h-[90vh] overflow-y-auto">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-studio-panel border border-studio-border rounded-lg p-6">
             <h2 className="font-semibold text-studio-text mb-4">{editing ? "Edit rule" : "New automation rule"}</h2>
             <div className="space-y-3 text-sm">
               <label className="block">
@@ -183,9 +183,9 @@ export default function AutomationPage() {
             </div>
             {formError && <div className="text-sm text-red-400 mt-3">{formError}</div>}
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 rounded-md border border-studio-border text-studio-text">Cancel</button>
+              <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 min-h-[44px] rounded-md border border-studio-border text-studio-text">Cancel</button>
               <button onClick={save} disabled={!form.name.trim() || !form.trigger_type.trim()}
-                className="text-sm bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+                className="text-sm bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
                 Save rule
               </button>
             </div>

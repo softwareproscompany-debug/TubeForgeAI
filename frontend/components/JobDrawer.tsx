@@ -105,18 +105,18 @@ export default function JobDrawer({
     <div className="fixed inset-0 z-40">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <aside className="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-studio-panel border-l border-studio-border overflow-y-auto">
-        <div className="sticky top-0 bg-studio-panel border-b border-studio-border px-5 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-studio-panel border-b border-studio-border px-5 py-4 flex items-center justify-between gap-3">
           <h2 className="font-semibold text-studio-text">Job detail</h2>
-          <button onClick={onClose} className="text-studio-muted hover:text-studio-text text-xl" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-studio-muted hover:text-studio-text text-xl min-h-[44px] min-w-[44px] shrink-0" aria-label="Close">×</button>
         </div>
         <div className="p-5">
           {loading && <div className="text-studio-muted text-sm">Loading job…</div>}
           {error && <div className="text-sm text-red-400">Error: {error}</div>}
           {wf && (
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge status={wf.status} />
-                <span className="text-xs text-studio-faint">temporal: {wf.temporal_workflow_id || "—"}</span>
+                <span className="text-xs text-studio-faint break-all">temporal: {wf.temporal_workflow_id || "—"}</span>
               </div>
               <dl className="text-sm space-y-2">
                 <Row k="Workflow ID" v={wf.id} />
@@ -133,7 +133,7 @@ export default function JobDrawer({
                     key={a}
                     disabled={acting}
                     onClick={() => control(a)}
-                    className="text-sm px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50"
+                    className="text-sm px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50"
                   >
                     {a[0].toUpperCase() + a.slice(1)}
                   </button>
@@ -145,8 +145,8 @@ export default function JobDrawer({
                   <ul className="space-y-2">
                     {approvals.map((a) => (
                       <li key={a.id} className="bg-studio-panel2 border border-amber-500/40 rounded p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
                             <div className="text-sm text-studio-text font-medium">{a.approval_type.replace(/_/g, " ")}</div>
                             <div className="text-[11px] text-studio-faint mt-0.5">
                               requested by {a.requested_by} · {fmtDate(a.requested_at)}
@@ -156,14 +156,14 @@ export default function JobDrawer({
                             <button
                               disabled={acting}
                               onClick={() => decide(a.id, "approved")}
-                              className="text-xs px-3 py-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-50"
+                              className="text-xs px-3 py-1.5 min-h-[44px] rounded-md bg-emerald-500/15 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-50"
                             >
                               Approve
                             </button>
                             <button
                               disabled={acting}
                               onClick={() => decide(a.id, "rejected")}
-                              className="text-xs px-3 py-1.5 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                              className="text-xs px-3 py-1.5 min-h-[44px] rounded-md bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                             >
                               Reject
                             </button>

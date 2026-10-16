@@ -160,15 +160,15 @@ export default function SettingsPage() {
         {loading ? (
           <p className="text-sm text-studio-muted animate-pulse">Checking session…</p>
         ) : authed && user ? (
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-sm">
-              <div className="text-studio-text font-medium">{user.username}</div>
-              <div className="text-studio-muted text-xs">{user.email}</div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-sm min-w-0">
+              <div className="text-studio-text font-medium break-words">{user.username}</div>
+              <div className="text-studio-muted text-xs break-all">{user.email}</div>
               <div className="text-studio-faint text-xs mt-1">
                 API calls use header <span className="font-mono">Authorization: Token …</span>
               </div>
             </div>
-            <button onClick={onLogout} className="text-sm px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-red-400/60 shrink-0">
+            <button onClick={onLogout} className="text-sm px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-red-400/60 shrink-0">
               Log out
             </button>
           </div>
@@ -183,7 +183,7 @@ export default function SettingsPage() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className={cls} />
             </label>
             <button onClick={onLogin} disabled={!username || !password || loginBusy}
-              className="bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+              className="bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
               {loginBusy ? "Signing in…" : "Log in"}
             </button>
           </div>
@@ -198,7 +198,7 @@ export default function SettingsPage() {
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={cls} />
           </label>
           <button onClick={saveProfile} disabled={!authed}
-            className="bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+            className="bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
             Save profile
           </button>
         </div>
@@ -216,7 +216,7 @@ export default function SettingsPage() {
             <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password" className={cls} />
           </label>
           <button onClick={changePassword} disabled={!authed || !currentPw || !newPw}
-            className="bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+            className="bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
             Change password
           </button>
           <p className="text-xs text-studio-faint">
@@ -256,7 +256,7 @@ export default function SettingsPage() {
                     </div>
                     <button
                       onClick={() => deletePasskey(pk.id, pk.name)}
-                      className="text-xs px-2.5 py-1.5 rounded-md border border-studio-border text-studio-muted hover:text-red-300 hover:border-red-400/60"
+                      className="text-xs px-2.5 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-muted hover:text-red-300 hover:border-red-400/60 shrink-0"
                     >
                       Remove
                     </button>
@@ -264,7 +264,7 @@ export default function SettingsPage() {
                 ))}
               </ul>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <label className="flex-1">
                 <span className="sr-only">Friendly name for the new passkey</span>
                 <input
@@ -278,7 +278,7 @@ export default function SettingsPage() {
               <button
                 onClick={addPasskey}
                 disabled={pkBusy}
-                className="bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50 shrink-0"
+                className="bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50 shrink-0"
               >
                 {pkBusy ? "Waiting…" : "Add passkey"}
               </button>
@@ -290,7 +290,7 @@ export default function SettingsPage() {
       <section className="bg-studio-panel border border-studio-border rounded-lg p-5">
         <h2 className="font-medium text-studio-text mb-3">System</h2>
         <div className="text-sm text-studio-muted space-y-1">
-          <div>API base: <span className="font-mono text-xs text-studio-text">{process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1</span></div>
+          <div>API base: <span className="font-mono text-xs text-studio-text break-all">{process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1</span></div>
           <div className="text-xs text-studio-faint">
             Budgets are enforced server-side per resource (local GPU, cloud GPU, paid API spend, storage) — never as a single combined credit.
           </div>

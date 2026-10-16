@@ -155,14 +155,14 @@ export default function BillingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-studio-text">Billing</h1>
           <p className="text-sm text-studio-muted mt-1">
             Plans, usage, and subscription management.
           </p>
         </div>
-        <Link href="/settings" className="text-sm text-accent hover:underline">
+        <Link href="/settings" className="text-sm text-accent hover:underline min-h-[44px] inline-flex items-center">
           ← Back to settings
         </Link>
       </div>
@@ -199,7 +199,7 @@ export default function BillingPage() {
             <button
               onClick={openPortal}
               disabled={busy !== null}
-              className="px-4 py-2 rounded-lg border border-studio-border text-sm text-studio-text hover:border-accent/50 disabled:opacity-50"
+              className="px-4 py-2 min-h-[44px] rounded-lg border border-studio-border text-sm text-studio-text hover:border-accent/50 disabled:opacity-50"
             >
               {busy === "portal" ? "Opening…" : "Manage subscription"}
             </button>
@@ -267,7 +267,7 @@ export default function BillingPage() {
                   {isCurrent ? (
                     <button
                       disabled
-                      className="w-full px-4 py-2 rounded-lg text-sm border border-studio-border text-studio-faint cursor-default"
+                      className="w-full px-4 py-2 min-h-[44px] rounded-lg text-sm border border-studio-border text-studio-faint cursor-default"
                     >
                       Current plan
                     </button>
@@ -280,7 +280,7 @@ export default function BillingPage() {
                     <button
                       onClick={() => startCheckout(tier.name)}
                       disabled={busy !== null}
-                      className="w-full px-4 py-2 rounded-lg text-sm font-medium bg-accent text-black hover:opacity-90 disabled:opacity-50"
+                      className="w-full px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium bg-accent text-black hover:opacity-90 disabled:opacity-50"
                     >
                       {busy === tier.name ? "Starting…" : `Upgrade to ${tier.display_name}`}
                     </button>

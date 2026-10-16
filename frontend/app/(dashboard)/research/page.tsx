@@ -97,7 +97,7 @@ export default function ResearchPage() {
             className="w-full bg-studio-bg border border-studio-border rounded-md px-3 py-2 text-studio-text placeholder:text-studio-faint" />
         </label>
         <button onClick={startRun} disabled={running || !query.trim() || !channelId}
-          className="bg-accent text-black font-medium text-sm px-4 py-2 rounded-md disabled:opacity-50">
+          className="bg-accent text-black font-medium text-sm px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
           {running ? "Starting…" : "Run research"}
         </button>
       </div>
@@ -129,7 +129,7 @@ export default function ResearchPage() {
                   <li key={r.id} className="text-xs bg-studio-panel2 border border-studio-border rounded p-2 flex justify-between gap-2">
                     <span className="text-studio-text truncate">{r.query}</span>
                     {["QUEUED", "RUNNING", "RESEARCHING"].includes(r.status.toUpperCase()) ? (
-                      <button onClick={() => cancelRun(r.id)} className="text-red-400 hover:underline shrink-0">Cancel</button>
+                      <button onClick={() => cancelRun(r.id)} className="text-red-400 hover:underline shrink-0 min-h-[44px] inline-flex items-center">Cancel</button>
                     ) : (
                       <span className="text-studio-faint shrink-0">{r.status}</span>
                     )}
@@ -176,7 +176,7 @@ function IdeaCard({ idea, onCreate }: { idea: ContentIdea; onCreate: () => void 
         <EvidenceBlock evidence={ev} />
       </div>
       <div className="mt-3 flex gap-2">
-        <button onClick={onCreate} className="text-xs bg-accent/15 border border-accent/40 text-accent px-3 py-1.5 rounded-md hover:bg-accent/25">
+        <button onClick={onCreate} className="text-xs bg-accent/15 border border-accent/40 text-accent px-3 py-1.5 min-h-[44px] rounded-md hover:bg-accent/25">
           Create project
         </button>
       </div>

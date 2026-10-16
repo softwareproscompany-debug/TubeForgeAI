@@ -20,7 +20,7 @@ function Err({ e, retry }: { e: Error; retry: () => void }) {
           correlation_id: {(e as unknown as { correlation_id: string }).correlation_id}
         </div>
       )}
-      <button onClick={retry} className="mt-2 text-xs underline hover:text-red-200">Retry</button>
+      <button onClick={retry} className="mt-2 text-xs underline hover:text-red-200 min-h-[44px] inline-flex items-center">Retry</button>
     </div>
   );
 }
@@ -118,7 +118,7 @@ export default function OverviewPage() {
                 if (inStage.length === 0) return null;
                 return (
                   <li key={s} className="flex items-center gap-3 text-sm">
-                    <span className="w-44 text-studio-muted">{s.replace(/_/g, " ")}</span>
+                    <span className="w-24 sm:w-44 shrink-0 truncate text-studio-muted">{s.replace(/_/g, " ")}</span>
                     <div className="flex-1 h-2 bg-studio-panel2 rounded overflow-hidden">
                       <div className="h-full bg-accent/70" style={{ width: `${Math.min(100, (inStage.length / Math.max(1, workflows.length)) * 100)}%` }} />
                     </div>

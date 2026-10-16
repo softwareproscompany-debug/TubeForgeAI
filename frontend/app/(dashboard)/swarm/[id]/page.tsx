@@ -55,7 +55,7 @@ function ReadableContent({ content }: { content: Record<string, unknown> }) {
       max_attempts?: number;
     };
   return (
-    <div className="space-y-2 text-sm">
+    <div className="space-y-2 text-sm break-words min-w-0">
       {stage && (
         <div className="text-xs uppercase tracking-wide text-studio-muted">
           Stage: {stage}
@@ -76,12 +76,12 @@ function ReadableContent({ content }: { content: Record<string, unknown> }) {
         </p>
       )}
       {verdict !== undefined && (
-        <pre className="rounded-lg bg-black/30 border border-studio-border p-3 text-xs text-studio-text overflow-x-auto whitespace-pre-wrap">
+        <pre className="rounded-lg bg-black/30 border border-studio-border p-3 text-xs text-studio-text overflow-x-auto whitespace-pre-wrap break-words">
           {JSON.stringify(verdict, null, 2)}
         </pre>
       )}
       {output !== undefined && (
-        <pre className="rounded-lg bg-black/30 border border-studio-border p-3 text-xs text-studio-text overflow-x-auto whitespace-pre-wrap">
+        <pre className="rounded-lg bg-black/30 border border-studio-border p-3 text-xs text-studio-text overflow-x-auto whitespace-pre-wrap break-words">
           {typeof output === "string" ? output : JSON.stringify(output, null, 2)}
         </pre>
       )}
@@ -159,7 +159,7 @@ export default function SwarmRunPage() {
 
   if (error && !run) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <div className="rounded border border-red-500/40 bg-red-500/10 text-red-400 px-4 py-3 text-sm">
           {error}
         </div>
@@ -170,17 +170,17 @@ export default function SwarmRunPage() {
     );
   }
   if (!run) {
-    return <div className="p-8 text-studio-muted">Loading run…</div>;
+    return <div className="p-4 sm:p-8 text-studio-muted">Loading run…</div>;
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto space-y-6 min-w-0">
       <Link href="/swarm" className="text-accent text-sm">
         ← Back to swarm
       </Link>
 
       {/* Status header */}
-      <div className="rounded-xl border border-studio-border bg-studio-panel p-6">
+      <div className="rounded-xl border border-studio-border bg-studio-panel p-4 sm:p-6 min-w-0">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-xl font-bold text-studio-text">{run.topic}</h1>
@@ -194,7 +194,7 @@ export default function SwarmRunPage() {
             }
           />
         </div>
-        <div className="flex items-center gap-6 mt-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 text-sm">
           <div>
             <span className="text-studio-muted">Stage: </span>
             <span className="text-studio-text font-medium capitalize">
@@ -211,7 +211,7 @@ export default function SwarmRunPage() {
             <button
               onClick={cancelRun}
               disabled={cancelling}
-              className="ml-auto rounded-lg border border-red-500/40 text-red-400 px-4 py-1.5 text-sm disabled:opacity-50"
+              className="ml-auto min-h-[44px] rounded-lg border border-red-500/40 text-red-400 px-4 py-1.5 text-sm disabled:opacity-50 touch-manipulation"
             >
               {cancelling ? "Cancelling…" : "Cancel run"}
             </button>
@@ -259,13 +259,13 @@ export default function SwarmRunPage() {
             {messages.map((m) => (
               <div
                 key={m.id}
-                className="rounded-xl border border-studio-border bg-studio-panel p-4"
+                className="rounded-xl border border-studio-border bg-studio-panel p-3 sm:p-4 min-w-0 w-full"
               >
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <span className="w-7 h-7 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center text-accent text-xs font-bold">
+                <div className="flex items-center gap-2 flex-wrap mb-2 min-w-0">
+                  <span className="w-7 h-7 shrink-0 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center text-accent text-xs font-bold">
                     {(m.from_agent ? m.from_agent.name : "S").charAt(0).toUpperCase()}
                   </span>
-                  <span className="text-sm text-studio-text font-medium">
+                  <span className="text-sm text-studio-text font-medium break-words min-w-0">
                     {agentLabel(m)}
                   </span>
                   <TypeBadge type={m.message_type} />
@@ -273,7 +273,7 @@ export default function SwarmRunPage() {
                     {fmtDate(m.created_at)}
                   </span>
                 </div>
-                <div className="pl-9">
+                <div className="pl-0 sm:pl-9 min-w-0">
                   <ReadableContent content={m.content} />
                 </div>
               </div>
