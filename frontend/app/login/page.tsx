@@ -134,12 +134,12 @@ export default function LoginPage() {
       )}
 
       <div className="mt-6 flex items-center justify-between text-sm">
-        <Link href="/register" className="text-accent hover:underline">
+        <Link href="/register" className="text-accent hover:underline touch-manipulation py-2">
           Create an account
         </Link>
         <Link
           href="/forgot-password"
-          className="text-studio-muted hover:text-studio-text hover:underline"
+          className="text-studio-muted hover:text-studio-text hover:underline touch-manipulation py-2"
         >
           Forgot password?
         </Link>

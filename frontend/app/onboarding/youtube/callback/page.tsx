@@ -77,7 +77,7 @@ function CallbackHandler() {
           <FormError message={error} />
           <button
             onClick={() => router.replace("/onboarding")}
-            className="w-full rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400"
+            className="w-full min-h-[48px] rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black hover:bg-cyan-400 touch-manipulation"
           >
             Back to setup
           </button>

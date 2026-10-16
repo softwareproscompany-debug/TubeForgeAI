@@ -132,7 +132,7 @@ export default function CommandCenterPage() {
         <button
           onClick={generatePlan}
           disabled={loading || !prompt.trim() || !projectId}
-          className="bg-accent text-black font-medium px-5 py-2 rounded-md hover:brightness-110 disabled:opacity-50"
+          className="bg-accent text-black font-medium px-5 py-2 min-h-[44px] rounded-md hover:brightness-110 disabled:opacity-50"
         >
           {loading ? "Generating plan…" : "Generate plan"}
         </button>

@@ -79,18 +79,18 @@ export default function PlanConfirmation({
         </div>
       )}
 
-      <div className="flex gap-3 pt-1">
+      <div className="flex flex-wrap gap-3 pt-1">
         <button
           onClick={onStart}
           disabled={starting}
-          className="bg-accent text-black font-medium px-5 py-2 rounded-md hover:brightness-110 disabled:opacity-50"
+          className="bg-accent text-black font-medium px-5 py-2 min-h-[44px] rounded-md hover:brightness-110 disabled:opacity-50"
         >
           {starting ? "Starting…" : "Start production"}
         </button>
         <button
           onClick={onDiscard}
           disabled={starting}
-          className="px-5 py-2 rounded-md border border-studio-border text-studio-text hover:border-red-400/60 disabled:opacity-50"
+          className="px-5 py-2 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-red-400/60 disabled:opacity-50"
         >
           Discard plan
         </button>

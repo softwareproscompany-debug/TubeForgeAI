@@ -99,7 +99,7 @@ export default function PreviewPlayer({
   const showVideo = !!activeVideo && isPlayableUrl(activeVideo.source);
 
   return (
-    <div className="bg-studio-panel border border-studio-border rounded-lg p-3">
+    <div className="bg-studio-panel border border-studio-border rounded-lg p-3 w-full max-w-full min-w-0">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-studio-muted">Preview</span>
         <span className="text-[11px] px-2 py-0.5 rounded border border-amber-500/40 text-amber-400 bg-amber-500/10">
@@ -167,10 +167,10 @@ export default function PreviewPlayer({
       </div>
 
       {/* transport */}
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-3 mt-2">
         <button
           onClick={onTogglePlay}
-          className="w-8 h-8 rounded-full bg-accent text-black flex items-center justify-center hover:brightness-110"
+          className="w-11 h-11 shrink-0 rounded-full bg-accent text-black flex items-center justify-center hover:brightness-110 touch-manipulation"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? "❚❚" : "▶"}
@@ -182,7 +182,7 @@ export default function PreviewPlayer({
           step={0.1}
           value={Math.min(playhead, edl.duration)}
           onChange={(e) => onSeek(Number(e.target.value))}
-          className="flex-1 accent-cyan-400"
+          className="flex-1 min-w-0 min-h-[44px] accent-cyan-400 touch-manipulation"
           aria-label="Seek"
         />
         <span className="text-[11px] font-mono text-studio-faint whitespace-nowrap">

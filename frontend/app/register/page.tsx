@@ -144,7 +144,7 @@ export default function RegisterPage() {
 
       <p className="mt-6 text-sm text-center text-studio-muted">
         Already have an account?{" "}
-        <Link href="/login" className="text-accent hover:underline">
+        <Link href="/login" className="text-accent hover:underline touch-manipulation inline-block py-2">
           Sign in
         </Link>
       </p>

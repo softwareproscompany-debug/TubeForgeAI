@@ -154,7 +154,7 @@ export default function ForgotPasswordPage() {
       {step === "done" && (
         <div className="space-y-4">
           <FormSuccess message="Password updated — you can sign in with it now." />
-          <Link href="/login" className={primaryBtnCls + " block text-center"}>
+          <Link href="/login" className={primaryBtnCls}>
             Back to sign in
           </Link>
         </div>
@@ -162,7 +162,7 @@ export default function ForgotPasswordPage() {
 
       {step !== "done" && (
         <p className="mt-6 text-sm text-center text-studio-muted">
-          <Link href="/login" className="text-accent hover:underline">
+          <Link href="/login" className="text-accent hover:underline touch-manipulation inline-block py-2">
             ← Back to sign in
           </Link>
         </p>

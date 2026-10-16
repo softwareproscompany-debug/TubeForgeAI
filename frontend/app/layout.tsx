@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "../lib/auth";
 import Shell from "../components/Shell";
@@ -6,6 +6,12 @@ import Shell from "../components/Shell";
 export const metadata: Metadata = {
   title: "TubeForge AI",
   description: "Private AI-powered YouTube operating system",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -60,7 +60,7 @@ export default function SwarmPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8">
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-studio-text">Agent Swarm</h1>
         <p className="text-studio-muted mt-1">
@@ -78,7 +78,7 @@ export default function SwarmPage() {
 
       <form
         onSubmit={startRun}
-        className="rounded-xl border border-studio-border bg-studio-panel p-6 space-y-4"
+        className="rounded-xl border border-studio-border bg-studio-panel p-4 sm:p-6 space-y-4"
       >
         <h2 className="text-lg font-semibold text-studio-text">Start a new run</h2>
         <div>
@@ -86,7 +86,7 @@ export default function SwarmPage() {
           <select
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="w-full rounded-lg bg-studio-panel2 border border-studio-border px-3 py-2.5 text-studio-text"
+            className="w-full text-base rounded-lg bg-studio-panel2 border border-studio-border px-3 py-2.5 text-studio-text"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -102,7 +102,7 @@ export default function SwarmPage() {
             onChange={(e) => setTopic(e.target.value)}
             rows={3}
             placeholder="e.g. How to brew pour-over coffee for beginners"
-            className="w-full rounded-lg bg-studio-panel2 border border-studio-border px-3 py-2.5 text-studio-text placeholder:text-studio-muted/60"
+            className="w-full text-base rounded-lg bg-studio-panel2 border border-studio-border px-3 py-2.5 text-studio-text placeholder:text-studio-muted/60"
           />
         </div>
         {startError && (
@@ -113,7 +113,7 @@ export default function SwarmPage() {
         <button
           type="submit"
           disabled={starting || !projectId || !topic.trim()}
-          className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-black disabled:opacity-50"
+          className="w-full sm:w-auto min-h-[48px] rounded-lg bg-accent px-5 py-2.5 font-semibold text-black disabled:opacity-50 touch-manipulation"
         >
           {starting ? "Starting…" : "Start swarm run"}
         </button>

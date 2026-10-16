@@ -46,12 +46,12 @@ export default function ChannelsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-studio-text">Channels</h1>
         <button
           onClick={connect}
           disabled={connecting}
-          className="bg-accent text-black font-medium text-sm px-4 py-2 rounded-md hover:brightness-110 disabled:opacity-50"
+          className="bg-accent text-black font-medium text-sm px-4 py-2 min-h-[44px] rounded-md hover:brightness-110 disabled:opacity-50"
         >
           {connecting ? "Connecting…" : "+ Connect channel"}
         </button>

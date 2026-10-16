@@ -75,7 +75,7 @@ export default function AnalyticsPage() {
           <div className="flex gap-2">
             <input value={videoId} onChange={(e) => setVideoId(e.target.value)} placeholder="YouTube video ID"
               className="bg-studio-bg border border-studio-border rounded-md px-2 py-1.5 text-studio-text text-sm placeholder:text-studio-faint" />
-            <button onClick={loadVideo} className="text-sm px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-accent/60">
+            <button onClick={loadVideo} className="text-sm px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-accent/60">
               Load
             </button>
           </div>

@@ -4,26 +4,29 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 
 export const fieldCls =
-  "mt-1 w-full bg-studio-bg border border-studio-border rounded-md px-3 py-2.5 text-studio-text placeholder:text-studio-faint focus:outline-none focus:border-accent/70 focus:ring-1 focus:ring-accent/40";
+  "mt-1 w-full bg-studio-bg border border-studio-border rounded-md px-3 py-2.5 text-base text-studio-text placeholder:text-studio-faint focus:outline-none focus:border-accent/70 focus:ring-1 focus:ring-accent/40";
 
 export const primaryBtnCls =
-  "w-full bg-accent text-black font-semibold px-4 py-2.5 rounded-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition";
+  "w-full min-h-[48px] flex items-center justify-center bg-accent text-black font-semibold px-4 py-2.5 rounded-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition touch-manipulation";
 
 export const ghostBtnCls =
-  "w-full border border-studio-border text-studio-text px-4 py-2.5 rounded-md hover:border-accent/60 disabled:opacity-50 disabled:cursor-not-allowed transition";
+  "w-full min-h-[48px] flex items-center justify-center border border-studio-border text-studio-text px-4 py-2.5 rounded-md hover:border-accent/60 disabled:opacity-50 disabled:cursor-not-allowed transition touch-manipulation";
 
 export function AuthCard({
   title,
   subtitle,
   children,
+  className,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  /** Replaces the default max-w-sm (e.g. "max-w-lg" for wider wizards). */
+  className?: string;
 }) {
   return (
-    <div className="w-full max-w-md">
-      <div className="bg-studio-panel border border-studio-border rounded-xl p-8 shadow-2xl">
+    <div className={`w-full min-w-0 mx-auto ${className ?? "max-w-sm"}`}>
+      <div className="bg-studio-panel border border-studio-border rounded-xl p-6 shadow-2xl">
         <div className="mb-6 text-center">
           <div className="text-2xl font-bold tracking-tight text-studio-text">
             TubeForge <span className="text-accent">AI</span>
