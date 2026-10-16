@@ -77,7 +77,7 @@ export default function QueuePage() {
         <Filter label="Stage" value={fStage} onChange={setFStage} options={stages} />
         <Filter label="Provider" value={fProvider} onChange={setFProvider} options={providers.map((p) => p.id)} labels={Object.fromEntries(providers.map((p) => [p.id, p.name]))} />
         {(fStatus || fStage || fProvider) && (
-          <button onClick={() => { setFStatus(""); setFStage(""); setFProvider(""); }} className="text-xs text-studio-muted hover:text-studio-text self-end pb-2">
+          <button onClick={() => { setFStatus(""); setFStage(""); setFProvider(""); }} className="text-xs text-studio-muted hover:text-studio-text self-end min-h-[44px] pb-2">
             Clear filters
           </button>
         )}
@@ -161,7 +161,7 @@ function Filter({
     <label className="text-xs">
       <span className="text-studio-muted block mb-1">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="bg-studio-panel2 border border-studio-border rounded-md px-2 py-1.5 text-studio-text text-sm">
+        className="bg-studio-panel2 border border-studio-border rounded-md px-2 py-1.5 min-h-[44px] text-studio-text text-sm">
         <option value="">All</option>
         {options.map((o) => <option key={o} value={o}>{labels?.[o] || o}</option>)}
       </select>

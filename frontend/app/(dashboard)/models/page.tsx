@@ -85,7 +85,7 @@ export default function ModelsPage() {
                 <div className="text-xs text-studio-faint mt-0.5">
                   adapter: {p.adapter_type} · deployment: {p.deployment_type} · priority {p.priority}
                 </div>
-                <div className="text-xs text-studio-faint font-mono mt-0.5 truncate max-w-md">{p.base_url}</div>
+                <div className="text-xs text-studio-faint font-mono mt-0.5 truncate max-w-full">{p.base_url}</div>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={p.health_status} />
@@ -100,15 +100,15 @@ export default function ModelsPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button disabled={acting === p.id + "health-check"} onClick={() => act(p.id, "health-check")}
-                className="text-xs px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50">
+                className="text-xs px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50">
                 Test connection
               </button>
               <button disabled={acting === p.id + "test-generation"} onClick={() => act(p.id, "test-generation")}
-                className="text-xs px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50">
+                className="text-xs px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50">
                 Test generation
               </button>
               <button disabled={acting === p.id + "toggle"} onClick={() => toggle(p)}
-                className="text-xs px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-red-400/60 disabled:opacity-50">
+                className="text-xs px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-red-400/60 disabled:opacity-50">
                 {p.enabled ? "Disable" : "Enable"}
               </button>
             </div>
@@ -123,7 +123,7 @@ export default function ModelsPage() {
         <section>
           <h2 className="font-medium text-studio-text mb-3">Models</h2>
           <div className="bg-studio-panel border border-studio-border rounded-lg overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-studio-faint border-b border-studio-border">
                   <th className="px-4 py-2">Model</th>

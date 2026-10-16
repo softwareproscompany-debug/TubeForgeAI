@@ -24,7 +24,7 @@ const labelCls = "block text-[11px] text-studio-faint";
 export default function Inspector({ clip, trackType, onPatch, onDelete }: InspectorProps) {
   if (!clip) {
     return (
-      <div className="bg-studio-panel border border-studio-border rounded-lg p-3">
+      <div className="bg-studio-panel border border-studio-border rounded-lg p-3 w-full min-w-0">
         <h3 className="text-xs font-medium text-studio-text mb-2">Clip</h3>
         <p className="text-xs text-studio-faint">
           Click a clip in the timeline to edit its properties, transitions, and text
@@ -46,7 +46,7 @@ export default function Inspector({ clip, trackType, onPatch, onDelete }: Inspec
     });
 
   return (
-    <div className="bg-studio-panel border border-studio-border rounded-lg p-3 space-y-3">
+    <div className="bg-studio-panel border border-studio-border rounded-lg p-3 space-y-3 w-full min-w-0">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-medium text-studio-text">Clip</h3>
         <button onClick={onDelete} className="text-[11px] text-red-400 hover:underline">
@@ -74,7 +74,7 @@ export default function Inspector({ clip, trackType, onPatch, onDelete }: Inspec
         />
       </label>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <label className={labelCls}>
           Start (s)
           <input
@@ -108,7 +108,7 @@ export default function Inspector({ clip, trackType, onPatch, onDelete }: Inspec
       {/* transitions */}
       <div>
         <div className="text-[11px] text-studio-faint mb-1">Transitions</div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {(["in", "out"] as const).map((edge) => (
             <label key={edge} className={labelCls}>
               {edge === "in" ? "Head" : "Tail"}
@@ -143,7 +143,7 @@ export default function Inspector({ clip, trackType, onPatch, onDelete }: Inspec
                 className={inputCls}
               />
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <label className={labelCls}>
                 X position
                 <input
@@ -161,7 +161,7 @@ export default function Inspector({ clip, trackType, onPatch, onDelete }: Inspec
                 />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <label className={labelCls}>
                 Font size
                 <input

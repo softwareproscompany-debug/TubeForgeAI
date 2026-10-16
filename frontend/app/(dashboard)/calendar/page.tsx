@@ -52,19 +52,21 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-studio-text">Content Calendar</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCursor((c) => ({ year: c.month === 0 ? c.year - 1 : c.year, month: (c.month + 11) % 12 }))}
-            className="px-3 py-1.5 text-sm border border-studio-border rounded-md text-studio-text hover:border-accent/60"
+            className="px-3 py-1.5 min-h-[44px] min-w-[44px] text-sm border border-studio-border rounded-md text-studio-text hover:border-accent/60"
+            aria-label="Previous month"
           >
             ←
           </button>
           <span className="text-sm text-studio-text w-40 text-center">{monthName}</span>
           <button
             onClick={() => setCursor((c) => ({ year: c.month === 11 ? c.year + 1 : c.year, month: (c.month + 1) % 12 }))}
-            className="px-3 py-1.5 text-sm border border-studio-border rounded-md text-studio-text hover:border-accent/60"
+            className="px-3 py-1.5 min-h-[44px] min-w-[44px] text-sm border border-studio-border rounded-md text-studio-text hover:border-accent/60"
+            aria-label="Next month"
           >
             →
           </button>
@@ -81,7 +83,8 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-7 gap-px bg-studio-border border border-studio-border rounded-lg overflow-hidden">
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="grid grid-cols-7 gap-px bg-studio-border border border-studio-border rounded-lg overflow-hidden min-w-[560px]">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="bg-studio-panel2 text-xs text-studio-muted text-center py-2">{d}</div>
         ))}
@@ -106,15 +109,16 @@ export default function CalendarPage() {
             )}
           </div>
         ))}
+        </div>
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-40 p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSelected(null)} />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-studio-panel border border-studio-border rounded-lg p-5">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto bg-studio-panel border border-studio-border rounded-lg p-5">
             <div className="flex items-start justify-between gap-3">
               <h2 className="font-semibold text-studio-text">{selected.title}</h2>
-              <button onClick={() => setSelected(null)} className="text-studio-muted hover:text-studio-text text-xl" aria-label="Close">×</button>
+              <button onClick={() => setSelected(null)} className="text-studio-muted hover:text-studio-text text-xl min-h-[44px] min-w-[44px] shrink-0" aria-label="Close">×</button>
             </div>
             <div className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-studio-faint">Scheduled</span><span className="text-studio-text">{fmtDate(selected.scheduled_at)}</span></div>
@@ -122,7 +126,7 @@ export default function CalendarPage() {
               <div className="flex justify-between items-center"><span className="text-studio-faint">Status</span><StatusBadge status={selected.status} /></div>
               <div className="flex justify-between"><span className="text-studio-faint">Attempts</span><span className="text-studio-text">{selected.attempt_count}</span></div>
               {selected.last_error && (
-                <div><span className="text-studio-faint">Last error</span><div className="text-red-400 text-xs mt-1">{selected.last_error}</div></div>
+                <div><span className="text-studio-faint">Last error</span><div className="text-red-400 text-xs mt-1 break-words">{selected.last_error}</div></div>
               )}
               <a href="/publishing" className="inline-block text-accent text-sm hover:underline mt-2">Manage in Publishing →</a>
             </div>

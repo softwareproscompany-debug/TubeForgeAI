@@ -69,17 +69,17 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Link href="/projects" className="text-xs text-accent hover:underline">← Projects</Link>
-          <h1 className="text-xl font-semibold text-studio-text mt-1">{project.title}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Link href="/projects" className="text-xs text-accent hover:underline min-h-[44px] inline-flex items-center">← Projects</Link>
+          <h1 className="text-xl font-semibold text-studio-text mt-1 break-words">{project.title}</h1>
           <div className="text-xs text-studio-faint mt-1">
             {project.format} · {project.aspect_ratio} · {Math.round(project.target_duration_seconds / 60)} min · {project.language}
           </div>
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={project.status} />
-          <button onClick={del} className="text-xs text-red-400 hover:underline">Delete</button>
+          <button onClick={del} className="text-xs text-red-400 hover:underline min-h-[44px] inline-flex items-center">Delete</button>
         </div>
       </div>
 
@@ -98,12 +98,12 @@ export default function ProjectDetailPage() {
           <ul className="space-y-2">
             {scripts.map((s) => (
               <li key={s.id} className="bg-studio-panel2 border border-studio-border rounded p-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-studio-text font-medium">v{s.version_number} — {s.fact_check_status}</div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={s.approval_status} />
                     {s.approval_status.toUpperCase() !== "APPROVED" && (
-                      <button onClick={() => approveScript(s.id)} className="text-xs text-accent hover:underline">Approve</button>
+                      <button onClick={() => approveScript(s.id)} className="text-xs text-accent hover:underline min-h-[44px] inline-flex items-center">Approve</button>
                     )}
                   </div>
                 </div>
@@ -125,7 +125,7 @@ export default function ProjectDetailPage() {
         ) : (
           <ol className="space-y-2">
             {scenes.map((sc) => (
-              <li key={sc.id} className="bg-studio-panel2 border border-studio-border rounded p-3 flex items-start justify-between gap-3">
+              <li key={sc.id} className="bg-studio-panel2 border border-studio-border rounded p-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-sm text-studio-text"><span className="text-accent font-mono mr-2">{String(sc.position).padStart(2, "0")}</span>{sc.visual_prompt || "(untitled scene)"}</div>
                   <div className="text-xs text-studio-muted mt-1">{sc.script_segment}</div>
@@ -149,7 +149,7 @@ export default function ProjectDetailPage() {
         ) : (
           <ul className="space-y-2">
             {workflows.map((w) => (
-              <li key={w.id} className="flex items-center justify-between text-sm gap-3">
+              <li key={w.id} className="flex flex-wrap items-center justify-between text-sm gap-3">
                 <span className="text-studio-text font-mono text-xs">{w.id.slice(0, 12)}… · {w.workflow_type}</span>
                 <StatusBadge status={w.status} />
               </li>

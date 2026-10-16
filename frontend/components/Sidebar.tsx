@@ -74,48 +74,104 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  return (
-    <aside className="fixed inset-y-0 left-0 w-60 bg-studio-panel border-r border-studio-border flex flex-col">
-      <div className="px-5 py-5 border-b border-studio-border">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-accent/15 border border-accent/40 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" strokeLinejoin="round" />
+
+  // onClose only ever closes the mobile drawer: the drawer is the only
+  // sidebar instance rendered below md, so the effect is mobile-only.
+  const nav = (
+    <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5" aria-label="Primary">
+      {NAV.map((item) => {
+        const active =
+          pathname === item.href || pathname?.startsWith(item.href + "/");
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onClose}
+            className={`flex items-center gap-3 px-3 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
+              active
+                ? "bg-accent/10 text-accent border border-accent/30"
+                : "text-studio-muted hover:text-studio-text hover:bg-studio-panel2 border border-transparent"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              {ICONS[item.icon]}
             </svg>
-          </div>
-          <div>
-            <div className="font-semibold text-studio-text tracking-wide">TubeForge AI</div>
-            <div className="text-[11px] text-studio-faint">YouTube OS · Private</div>
-          </div>
+            <span className="truncate">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  const brand = (
+    <div className="px-5 py-5 border-b border-studio-border">
+      <div className="flex items-center gap-2.5">
+        <div className="w-9 h-9 rounded-lg bg-accent/15 border border-accent/40 flex items-center justify-center shrink-0">
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <div className="font-semibold text-studio-text tracking-wide truncate">TubeForge AI</div>
+          <div className="text-[11px] text-studio-faint truncate">YouTube OS · Private</div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {NAV.map((item) => {
-          const active =
-            pathname === item.href || pathname?.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                active
-                  ? "bg-accent/10 text-accent border border-accent/30"
-                  : "text-studio-muted hover:text-studio-text hover:bg-studio-panel2 border border-transparent"
-              }`}
-            >
-              <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                {ICONS[item.icon]}
-              </svg>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="px-5 py-4 border-t border-studio-border text-[11px] text-studio-faint">
-        Local-first AI gateway · no per-generation credits
-      </div>
-    </aside>
+    </div>
+  );
+
+  const footer = (
+    <div className="px-5 py-4 border-t border-studio-border text-[11px] text-studio-faint">
+      Local-first AI gateway · no per-generation credits
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop: static sidebar, unchanged from before */}
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 bg-studio-panel border-r border-studio-border flex-col">
+        {brand}
+        {nav}
+        {footer}
+      </aside>
+
+      {/* Mobile: backdrop that closes the drawer on click */}
+      <div
+        className={`md:hidden fixed inset-0 z-30 bg-black/60 transition-opacity duration-300 ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={onClose}
+        aria-hidden={!open}
+      />
+
+      {/* Mobile: slide-over drawer */}
+      <aside
+        className={`md:hidden fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] bg-studio-panel border-r border-studio-border flex flex-col transition-transform duration-300 ease-out ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+        aria-hidden={!open}
+      >
+        <div className="relative">
+          {brand}
+          <button
+            onClick={onClose}
+            aria-label="Close navigation"
+            className="absolute top-4 right-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-studio-muted hover:text-studio-text"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        {nav}
+        {footer}
+      </aside>
+    </>
   );
 }

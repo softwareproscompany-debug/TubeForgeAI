@@ -46,7 +46,7 @@ export default function HealthPage() {
       <div className="bg-red-500/10 border border-red-500/40 rounded-lg p-4">
         <div className="text-sm text-red-300 font-medium">API unreachable</div>
         <div className="text-sm text-red-300/80 mt-1">{error || "No health data."}</div>
-        <button onClick={load} className="mt-2 text-xs underline text-red-300">Retry</button>
+        <button onClick={load} className="mt-2 text-xs underline text-red-300 min-h-[44px] inline-flex items-center">Retry</button>
       </div>
     );
 
@@ -63,11 +63,11 @@ export default function HealthPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-studio-text">System Health</h1>
         <div className="flex items-center gap-3">
           <StatusBadge status={health.status} />
-          <button onClick={load} className="text-xs text-studio-muted hover:text-studio-text underline">Refresh</button>
+          <button onClick={load} className="text-xs text-studio-muted hover:text-studio-text underline min-h-[44px] inline-flex items-center">Refresh</button>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ export default function HealthPage() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Metric label="CPU" value={health.cpu_percent !== null && health.cpu_percent !== undefined ? `${health.cpu_percent}%` : "—"} />
         <Metric label="RAM" value={health.ram_percent !== null && health.ram_percent !== undefined ? `${health.ram_percent}%` : "—"} />
         <Metric label="Disk" value={health.disk_percent !== null && health.disk_percent !== undefined ? `${health.disk_percent}%` : "—"} />
@@ -105,10 +105,10 @@ export default function HealthPage() {
         ) : (
           <ul className="space-y-1.5">
             {Object.entries(health.checks).map(([k, v]) => (
-              <li key={k} className="flex items-center justify-between text-sm">
-                <span className="text-studio-text">{k}</span>
+              <li key={k} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="text-studio-text break-words min-w-0">{k}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-xs text-studio-faint font-mono">{v}</span>
+                  <span className="text-xs text-studio-faint font-mono break-all">{v}</span>
                   <StatusBadge status={v === "ok" ? "HEALTHY" : v === "not_configured" ? "PAUSED" : "UNHEALTHY"} />
                 </span>
               </li>
@@ -140,7 +140,7 @@ export default function HealthPage() {
         ) : (
           <ul className="space-y-1.5">
             {failures.slice(0, 10).map((w) => (
-              <li key={w.id} className="text-sm flex justify-between gap-3">
+              <li key={w.id} className="text-sm flex flex-wrap justify-between gap-3">
                 <span className="text-studio-text font-mono text-xs">{w.id.slice(0, 12)}… · {w.workflow_type}</span>
                 <span className="text-xs text-studio-faint">{fmtDate(w.completed_at || w.created_at)}</span>
               </li>
@@ -156,7 +156,7 @@ export default function HealthPage() {
         ) : (
           <ul className="space-y-1.5">
             {securityEvents.map((e) => (
-              <li key={e.id} className="text-sm flex justify-between gap-3">
+              <li key={e.id} className="text-sm flex flex-wrap justify-between gap-3">
                 <span className="text-studio-text">{e.actor} — {e.action} <span className="text-studio-faint">({e.resource_type})</span></span>
                 <span className="text-xs text-studio-faint">{fmtDate(e.occurred_at)}</span>
               </li>

@@ -82,10 +82,10 @@ export default function PublishingPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-studio-text">Publishing</h1>
         <button onClick={() => setShowNew(true)}
-          className="bg-accent text-black font-medium text-sm px-4 py-2 rounded-md hover:brightness-110">
+          className="bg-accent text-black font-medium text-sm px-4 py-2 min-h-[44px] rounded-md hover:brightness-110">
           + New publication
         </button>
       </div>
@@ -109,7 +109,7 @@ export default function PublishingPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-studio-text font-medium truncate">{p.title}</div>
-                <div className="text-xs text-studio-faint mt-0.5">
+                <div className="text-xs text-studio-faint mt-0.5 break-words">
                   {p.visibility} · attempts {p.attempt_count}
                   {p.youtube_video_id ? ` · youtube: ${p.youtube_video_id}` : ""}
                   {p.scheduled_at ? ` · scheduled ${fmtDate(p.scheduled_at)}` : ""}
@@ -125,7 +125,7 @@ export default function PublishingPage() {
                   key={a}
                   disabled={acting === p.id + a}
                   onClick={() => action(p.id, a)}
-                  className="text-xs px-3 py-1.5 rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50"
+                  className="text-xs px-3 py-1.5 min-h-[44px] rounded-md border border-studio-border text-studio-text hover:border-accent/60 disabled:opacity-50"
                 >
                   {a[0].toUpperCase() + a.slice(1)}
                 </button>
@@ -136,9 +136,9 @@ export default function PublishingPage() {
       </div>
 
       {showNew && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-40 p-4">
           <div className="absolute inset-0 bg-black/70" onClick={() => setShowNew(false)} />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-studio-panel border border-studio-border rounded-lg p-6 max-h-[90vh] overflow-y-auto">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-studio-panel border border-studio-border rounded-lg p-6">
             <h2 className="font-semibold text-studio-text mb-4">New publication</h2>
             <div className="space-y-3 text-sm">
               <Field label="Project">
@@ -157,7 +157,7 @@ export default function PublishingPage() {
               <Field label="Tags (comma-separated)">
                 <input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className={inputCls} />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Visibility">
                   <select value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })} className={inputCls}>
                     <option value="private">Private</option>
@@ -171,9 +171,9 @@ export default function PublishingPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowNew(false)} className="text-sm px-4 py-2 rounded-md border border-studio-border text-studio-text">Cancel</button>
+              <button onClick={() => setShowNew(false)} className="text-sm px-4 py-2 min-h-[44px] rounded-md border border-studio-border text-studio-text">Cancel</button>
               <button onClick={create} disabled={!form.title.trim() || acting === "create"}
-                className="text-sm bg-accent text-black font-medium px-4 py-2 rounded-md disabled:opacity-50">
+                className="text-sm bg-accent text-black font-medium px-4 py-2 min-h-[44px] rounded-md disabled:opacity-50">
                 {acting === "create" ? "Creating…" : "Create (draft)"}
               </button>
             </div>

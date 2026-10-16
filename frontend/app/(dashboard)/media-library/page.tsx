@@ -35,7 +35,7 @@ export default function MediaLibraryPage() {
     <div className="space-y-5">
       <h1 className="text-xl font-semibold text-studio-text">Media Library</h1>
 
-      <div className="flex gap-3 bg-studio-panel border border-studio-border rounded-lg p-3">
+      <div className="flex flex-wrap gap-3 bg-studio-panel border border-studio-border rounded-lg p-3">
         <label className="text-xs">
           <span className="text-studio-muted block mb-1">Type</span>
           <select value={fType} onChange={(e) => setFType(e.target.value)}
@@ -96,17 +96,17 @@ function AssetPanel({ asset, onClose }: { asset: Asset; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <aside className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-studio-panel border-l border-studio-border overflow-y-auto p-5">
-        <div className="flex items-center justify-between mb-4">
+      <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[calc(100vw-2rem)] sm:max-w-md bg-studio-panel border-l border-studio-border overflow-y-auto p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="font-semibold text-studio-text">Asset detail</h2>
-          <button onClick={onClose} className="text-studio-muted hover:text-studio-text text-xl" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-studio-muted hover:text-studio-text text-xl min-h-[44px] min-w-[44px] shrink-0" aria-label="Close">×</button>
         </div>
         <div className="space-y-4 text-sm">
           <div className="flex items-center gap-2">
             <StatusBadge status={asset.status} />
             <span className="text-studio-faint text-xs">{asset.asset_type}</span>
           </div>
-          <KV k="ID" v={asset.id} mono />
+          <KV k="ID" v={asset.id} mono wrap />
           <KV k="SHA-256" v={asset.sha256} mono wrap />
           <KV k="MIME" v={asset.mime_type} />
           <KV k="Source" v={asset.source_type} />
